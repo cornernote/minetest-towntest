@@ -32,8 +32,8 @@ minetest.register_entity("towntest_npc:builder", {
 
 	on_activate = function(self, staticdata)
 		-- remove npcs from old game
-		if staticdata~=towntest.game_id then
-			--self.object:remove()
+		if staticdata~="" and staticdata~=towntest.game_id then
+			self.object:remove()
 		end
 	end,
 
