@@ -21,7 +21,7 @@ towntest_chest.npc = {}
 towntest_chest.get_files = function(size)
 	local directory = minetest.get_modpath("towntest_chest").."/buildings"
 	local output
-	if os.getenv('home')~=nil then 
+	if os.getenv('HOME')~=nil then 
 		output = io.execute('ls -a "'..directory..'/*.we"') -- linux/mac
 	else
 		output = io.popen('dir "'..directory..'\\*.we" /b') -- windows
