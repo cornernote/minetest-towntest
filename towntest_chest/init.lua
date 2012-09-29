@@ -47,9 +47,23 @@ towntest_chest.load = function(filename)
 		minetest.chat_send_player(placer:get_player_name(), "[towntest_chest] error: could not open file \"" .. filepath .. "\"")
 		return
 	end
-	local contents = file:read("*a")
-	file:close()
-	return contents
+	-- load the building starting from the lowest y
+	local building = towntest_chest.get_table(file:read("*a"))
+	local building_ordered = {}
+	for i,v in ipairs(building) do
+		if not building_ordered[v.y] then building_ordered[v.y] = {} end
+		table.insert(building_ordered[v.y],v)
+	end
+	building = {}
+	local a = {}
+	for k in pairs(building_ordered) do table.insert(a, k) end
+	table.sort(a)
+	for i,k in ipairs(a) do
+		for ii,vv in ipairs(building_ordered[k]) do
+			table.insert(building,vv)
+		end
+	end
+	return towntest_chest.get_string(building)
 end
 
 -- get_table
@@ -81,7 +95,7 @@ towntest_chest.build = function(chestpos)
 	local k = chestpos.x..","..chestpos.y..","..chestpos.z
 	if not towntest_chest.npc[k] then
 		towntest_chest.npc[k] = minetest.env:add_entity(chestpos, "towntest_npc:builder")
-		towntest_chest.npc[k]:get_luaentity():moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},0,1)
+		towntest_chest.npc[k]:get_luaentity():moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},1)
 		if not inv:is_empty("builder") then
 			for i=1,inv:get_size("builder") do
 				inv:set_stack("builder", i, nil)
@@ -98,7 +112,7 @@ towntest_chest.build = function(chestpos)
 	-- no building plan
 	if building_plan=="" then
 		-- move the npc to the chest
-		npc:moveto(chestpos,2,2)
+		npc:moveto(chestpos,2,2,2)
 		return
 	end
 	
@@ -111,7 +125,7 @@ towntest_chest.build = function(chestpos)
 			if not npc.target then
 				table.remove(building_plan,i)
 				-- move the npc to the build area
-				npc:moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,function(self,after_param)
+				npc:moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,0,function(self,after_param)
 					-- take from the inv
 					after_param.inv:remove_item("builder", after_param.v.name.." 1")
 					after_param.inv:remove_item("needed", after_param.v.name.." 1")
@@ -142,7 +156,7 @@ towntest_chest.build = function(chestpos)
 			-- check if npc is already moving
 			if not npc.target then
 				-- move the npc to the chest
-				npc:moveto(chestpos,2,2,function(self,inv)
+				npc:moveto(chestpos,2,2,2,function(self,inv)
 					-- take from the inv
 					for i=1,qty do
 						if inv:contains_item("main",name.." 1") and inv:room_for_item("builder",name.." 1") then
@@ -156,7 +170,7 @@ towntest_chest.build = function(chestpos)
 	end
 	
 	-- stop building and tell the player what we need
-	npc:moveto(chestpos,2,2)
+	npc:moveto(chestpos,2,2,2)
 	towntest_chest.set_status(meta,0)
 	minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
 	towntest_chest.update_needed(meta:get_inventory(),building_plan)

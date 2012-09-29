@@ -22,23 +22,28 @@ minetest.register_entity("towntest_npc:builder", {
 
 	target = nil,
 	speed = nil,
+	range = nil,
+	range_y = nil,
 	after = nil,
 	after_param = nil,
 	
 	get_staticdata = function(self)
 		-- record current game
-		return minetest.serialize({game_id=towntest.game_id,chestpos=self.chestpos})
+		return minetest.serialize({chestpos=self.chestpos})
 	end,
 
 	on_activate = function(self, staticdata)
 		local data = minetest.deserialize(staticdata)
 		-- save chestpos
-		if not self.chestpos then
-			if data and data.chestpos then
-				self.chestpos = data.chestpos
-			else
-				self.chestpos = self.object:getpos()
+		if data and data.chestpos then
+			local k = data.chestpos.x..","..data.chestpos.y..","..data.chestpos.z
+			if towntest_chest.npc[k] then
+				self.object:remove()
 			end
+			towntest_chest.npc[k] = self.object
+			self.chestpos = data.chestpos
+		else
+			self.chestpos = self.object:getpos()
 		end
 	end,
 	
@@ -71,7 +76,7 @@ minetest.register_entity("towntest_npc:builder", {
 			vec.z = diff.z*v/amount
 			self.object:setvelocity(vec) -- walk in given direction
 
-			if math.abs(diff.x) < self.range and math.abs(diff.y) < self.range and math.abs(diff.z) < self.range then
+			if math.abs(diff.x) < self.range and math.abs(diff.y) < self.range_y and math.abs(diff.z) < self.range then
 				self.object:setvelocity({x=0, y=0, z=0})
 				self.target = nil
 				self.speed = nil
@@ -94,14 +99,18 @@ minetest.register_entity("towntest_npc:builder", {
 	-- self: the lua entity
 	-- pos: the position to move to
 	-- range: the distance within pos the npc will go to
+	-- range_y: the height within pos the npc will go to
 	-- speed: the speed at which the npc will move
 	-- after: callback function(self) which is triggered when the npc gets within range of pos
-	moveto = function(self, pos, range, speed, after, after_param)
+	moveto = function(self, pos, speed, range, range_y, after, after_param)
 		self.target = pos
-		self.speed = speed
+		self.speed = tonumber(speed) or 1
+		self.range = tonumber(range) or 0.1
+		self.range_y = tonumber(range_y) or 0.1
+		if self.speed < 0.1 then self.speed = 0.1 end
+		if self.range < 0.1 then self.range = 0.1 end
+		if self.range_y < 0.1 then self.range_y = 0.1 end
 		self.after = after
 		self.after_param = after_param
-		self.range = range
-		if self.range < 0.1 then self.range = 0.1 end
 	end
 })
