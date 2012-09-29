@@ -112,7 +112,7 @@ towntest_chest.build = function(chestpos)
 	-- no building plan
 	if building_plan=="" then
 		-- move the npc to the chest
-		npc:moveto(chestpos,2,2,2)
+		npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
 		return
 	end
 	
@@ -170,7 +170,7 @@ towntest_chest.build = function(chestpos)
 	end
 	
 	-- stop building and tell the player what we need
-	npc:moveto(chestpos,2,2,2)
+	npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
 	towntest_chest.set_status(meta,0)
 	minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
 	towntest_chest.update_needed(meta:get_inventory(),building_plan)
@@ -183,12 +183,21 @@ towntest_chest.formspec = function(pos,page)
 	-- chest page
 	if page=="chest" then
 		formspec = formspec 
-			.."size[8,9]"
+			.."size[10.5,9]"
+			.."list[current_player;main;0,5;8,4;]"
+
 			.."label[0,0; items needed:]"
 			.."list[current_name;needed;0,0.5;8,2;]"
+
 			.."label[0,2.5; put items here to build:]"
 			.."list[current_name;main;0,3;8,1;]"
-			.."list[current_player;main;0,5;8,4;]"
+			
+			.."label[8.5,0; builder:]"
+			.."list[current_name;builder;8.5,0.5;2,2;]"
+
+			.."label[8.5,2.5; lumberjack:]"
+			.."list[current_name;lumberjack;8.5,3.5;2,2;]"
+			
 		return formspec
 	end
 	-- main page
@@ -249,6 +258,7 @@ towntest_chest.after_place_node = function(pos,placer)
 	meta:get_inventory():set_size("main", 8)
 	meta:get_inventory():set_size("needed", 8*2)
 	meta:get_inventory():set_size("builder", 2*2)
+	meta:get_inventory():set_size("lumberjack", 2*2)
 	meta:set_string("formspec", towntest_chest.formspec(pos))
 	meta:set_string("infotext", "Building Chest (inactive)")
 	meta:set_string("owner", placer:get_player_name())
