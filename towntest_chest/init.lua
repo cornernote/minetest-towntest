@@ -76,17 +76,22 @@ end
 towntest_chest.build = function(chestpos)
 
 	-- create the npc if needed
+	local meta = minetest.env:get_meta(chestpos)
+	local inv = meta:get_inventory()
 	local k = chestpos.x..","..chestpos.y..","..chestpos.z
 	if not towntest_chest.npc[k] then
 		towntest_chest.npc[k] = minetest.env:add_entity(chestpos, "towntest_npc:builder")
 		towntest_chest.npc[k]:get_luaentity():moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},0,1)
+		if not inv:is_empty("builder") then
+			for i=1,inv:get_size("builder") do
+				inv:set_stack("builder", i, nil)
+			end
+		end
 	end
 	local npc = towntest_chest.npc[k]:get_luaentity()
 
 	-- load the building_plan
-	local meta = minetest.env:get_meta(chestpos)
 	if meta:get_int("building_status")~=1 then return end
-	local inv = meta:get_inventory()
 	local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
 	local materials = {}
 	
