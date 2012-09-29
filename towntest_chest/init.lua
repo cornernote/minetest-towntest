@@ -10,7 +10,9 @@ CHEST
 
 ]]--
 
+	--print(dump(os.execute('dir "'..minetest.get_modpath("towntest_chest")..'\\buildings\\*.we" /b')))
 
+	
 -- expose api
 towntest_chest = {}
 
@@ -19,15 +21,22 @@ towntest_chest.npc = {}
 
 -- get_files
 towntest_chest.get_files = function(size)
-	local directory = minetest.get_modpath("towntest_chest").."/buildings"
+	local modpath = minetest.get_modpath("towntest_chest")
 	local output
 	if os.getenv('HOME')~=nil then 
-		output = io.execute('ls -a "'..directory..'/*.we"') -- linux/mac
+		os.execute('\ls -a "'..directory..'/" | grep .we > "'..modpath..'/buildings/_buildings.tmp"') -- linux/mac
+		local file, err = io.open(modpath..'/buildings/_buildings.tmp', "rb")
+		if err ~= nil then
+			return
+		end
+		local output = file:read("*a"):lines()
 	else
-		output = io.popen('dir "'..directory..'\\*.we" /b') -- windows
+		output = io.popen('dir "'..modpath..'\\buildings\\*.we" /b'):lines()  -- windows
 	end
+
     local i, t = 0, {}
-    for filename in output:lines() do
+    for i,filename in output do
+	print(filename)
         i = i + 1
         t[i] = filename
     end
