@@ -78,12 +78,12 @@ towntest_chest.build = function(chestpos)
 			-- create the npc
 			local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 			local k = chestpos.x..","..chestpos.y..","..chestpos.z
-			if towntest_chest.npc[k]==nil then
+			if not towntest_chest.npc[k] then
 				towntest_chest.npc[k] = minetest.env:add_entity({x=chestpos.x,y=chestpos.y,z=chestpos.z}, "towntest_npc:builder")
 				towntest_chest.npc[k]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},0,1)
 			end
 			-- check if npc is already moving
-			if towntest_chest.npc[k]:get_luaentity().target==nil then
+			if not towntest_chest.npc[k]:get_luaentity().target then
 				table.remove(building,i)
 				-- move the npc
 				towntest_chest.npc[k]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,function(self,after_param)
@@ -99,7 +99,7 @@ towntest_chest.build = function(chestpos)
 			return true
 		end
 		-- make a list of materials needed
-		if materials[v.name]==nil then
+		if not materials[v.name] then
 			materials[v.name] = 1
 		else 
 			materials[v.name] = materials[v.name]+1
@@ -153,7 +153,7 @@ end
 -- on_receive_fields
 towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	local meta = minetest.env:get_meta(pos)
-	if fields.building ~= nil then
+	if fields.building then
 		meta:set_string("building_plan", towntest_chest.load(fields.building))
 		meta:set_string("formspec", towntest_chest.formspec(pos,"chest"))
 		towntest_chest.set_status(meta,1)
@@ -167,7 +167,7 @@ towntest_chest.update_needed = function(inv,building)
 	end
 	local materials = {}
 	for i,v in ipairs(building) do
-		if materials[v.name]==nil then
+		if not materials[v.name] then
 			materials[v.name] = 1
 		else 
 			materials[v.name] = materials[v.name]+1
@@ -188,9 +188,8 @@ towntest_chest.after_place_node = function(pos,placer)
 	meta:set_string("infotext", "Building Chest (inactive)")
 	meta:set_string("owner", placer:get_player_name())
 	-- add npc
-	if towntest_chest.npc[pos.x..","..pos.y..","..pos.z]==nil then
-		towntest_chest.npc[pos.x..","..pos.y..","..pos.z] = minetest.env:add_entity({x=pos.x,y=pos.y,z=pos.z}, "towntest_npc:builder")
-	end
+	towntest_chest.npc[pos.x..","..pos.y..","..pos.z] = minetest.env:add_entity({x=pos.x,y=pos.y,z=pos.z}, "towntest_npc:builder")
+	towntest_chest.npc[pos.x..","..pos.y..","..pos.z]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},0,1)
 end
 
 -- can_dig
