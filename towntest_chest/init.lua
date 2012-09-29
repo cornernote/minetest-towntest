@@ -75,21 +75,27 @@ towntest_chest.build = function(chestpos)
 	for i,v in ipairs(building) do
 		-- check if the chest contains the node
 		if inv:contains_item("main", v.name) then
-			-- take from the inv
-			inv:remove_item("main", v.name.." 1")
-			inv:remove_item("needed", v.name.." 1")
-			-- update the chest building plan
-			table.remove(building,i)
-			meta:set_string("building_plan", towntest_chest.get_string(building))
-			-- create/move the npc
+			-- create the npc
 			local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 			local k = chestpos.x..","..chestpos.y..","..chestpos.z
 			if towntest_chest.npc[k]==nil then
-				towntest_chest.npc[k] = minetest.env:add_entity({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z}, "towntest_chest:npc")
+				towntest_chest.npc[k] = minetest.env:add_entity({x=chestpos.x,y=chestpos.y,z=chestpos.z}, "towntest_npc:builder")
+				towntest_chest.npc[k]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},0,1)
 			end
-			towntest_chest.npc[k]:moveto({x=pos.x,y=pos.y+1.5,z=pos.z})
-			-- add the node to the world
-			minetest.env:add_node(pos, {name=v.name,param1=v.param1,param2=v.param2})
+			-- check if npc is already moving
+			if towntest_chest.npc[k]:get_luaentity().target==nil then
+				table.remove(building,i)
+				-- move the npc
+				towntest_chest.npc[k]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,function(self,after_param)
+					-- take from the inv
+					after_param.inv:remove_item("main", after_param.v.name.." 1")
+					after_param.inv:remove_item("needed", after_param.v.name.." 1")
+					-- add the node to the world
+					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
+					-- update the chest building plan
+					meta:set_string("building_plan", towntest_chest.get_string(building))
+				end, {pos=pos,v=v,inv=inv,meta=meta})
+			end
 			return true
 		end
 		-- make a list of materials needed
@@ -183,7 +189,7 @@ towntest_chest.after_place_node = function(pos,placer)
 	meta:set_string("owner", placer:get_player_name())
 	-- add npc
 	if towntest_chest.npc[pos.x..","..pos.y..","..pos.z]==nil then
-		towntest_chest.npc[pos.x..","..pos.y..","..pos.z] = minetest.env:add_entity({x=pos.x,y=pos.y+1.5,z=pos.z}, "towntest_chest:npc")
+		towntest_chest.npc[pos.x..","..pos.y..","..pos.z] = minetest.env:add_entity({x=pos.x,y=pos.y,z=pos.z}, "towntest_npc:builder")
 	end
 end
 
@@ -242,42 +248,10 @@ minetest.register_node("towntest_chest:chest", {
 	end,
 })
 
--- register_entity - the npc that builds
-minetest.register_entity("towntest_chest:npc", {
-	physical = true,
-	collisionbox = {-0.4, -1, -0.4, 0.4, 1, 0.4},
-	visual = "upright_sprite",
-	visual_size = {x=1, y=2},
-	textures = {"towntest_chest_npc.png", "towntest_chest_npc_back.png"},
-	timer = 0,
-	on_step = function(self, dtime)
-		self.timer = self.timer+dtime
-		if self.timer > 30 then
-			self.object:remove()
-			towntest_chest.npc[self.chestpos.x..","..self.chestpos.y..","..self.chestpos.z]=nil
-			return
-		end
-		sp = self.object:getpos()
-		if self.lp~=nil then
-			if sp.x~=self.lp.x or sp.y~=self.lp.y or sp.z~=self.lp.z then
-				self.timer = 0
-			end
-		end
-		self.lp = sp
-		if self.chestpos==nil then
-			local pos = self.object:getpos()
-			self.chestpos = {x=pos.x,y=pos.y-1.5,z=pos.z}
-		end
-		if math.random(50) == 1 then
-			self.object:setyaw(self.object:getyaw()+((math.random(0,360)-180)/180*math.pi))
-		end
-	end,
-})
-
 -- register_abm
 minetest.register_abm({
 	nodenames = {"towntest_chest:chest"},
-	interval = 1,
+	interval = 0.5,
 	chance = 1,
 	action = towntest_chest.build,
 })
