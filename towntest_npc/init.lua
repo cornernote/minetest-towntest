@@ -3,7 +3,7 @@
 Towntest for Minetest
 
 Copyright (c) 2012 cornernote, Brett O'Donnell <cornernote@gmail.com>
-Source Code: https://github.com/cornernote/minetest-particles
+Source Code: https://github.com/cornernote/minetest-towntest
 License: GPLv3
 
 NPCs
@@ -79,7 +79,7 @@ minetest.register_entity("towntest_npc:builder", {
 	end,
 
 	-- API
-	-- self: the object
+	-- self: the lua entity
 	-- pos: the position to move to
 	-- range: the distance within pos the npc will go to
 	-- speed: the speed at which the npc will move

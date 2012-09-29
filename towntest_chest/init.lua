@@ -3,7 +3,7 @@
 Towntest for Minetest
 
 Copyright (c) 2012 cornernote, Brett O'Donnell <cornernote@gmail.com>
-Source Code: https://github.com/cornernote/minetest-particles
+Source Code: https://github.com/cornernote/minetest-towntest
 License: GPLv3
 
 CHEST
@@ -20,12 +20,14 @@ towntest_chest.npc = {}
 -- get_files
 towntest_chest.get_files = function(size)
 	local directory = minetest.get_modpath("towntest_chest").."/buildings"
-	local command = 'dir "'..directory..'\\*.we" /b' -- windows
+	local output
 	if os.getenv('home')~=nil then 
-		command = 'ls -a "'..directory..'/*.we"' -- linux/mac
+		output = io.execute('ls -a "'..directory..'/*.we"') -- linux/mac
+	else
+		output = io.popen('dir "'..directory..'\\*.we" /b') -- windows
 	end
-    local i, t, popen = 0, {}, io.popen
-    for filename in popen(command):lines() do
+    local i, t = 0, {}
+    for filename in output:lines() do
         i = i + 1
         t[i] = filename
     end
