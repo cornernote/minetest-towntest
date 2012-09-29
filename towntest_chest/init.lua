@@ -10,8 +10,6 @@ CHEST
 
 ]]--
 
-	--print(dump(os.execute('dir "'..minetest.get_modpath("towntest_chest")..'\\buildings\\*.we" /b')))
-
 	
 -- expose api
 towntest_chest = {}
@@ -20,23 +18,21 @@ towntest_chest = {}
 towntest_chest.npc = {}
 
 -- get_files
-towntest_chest.get_files = function(size)
+towntest_chest.get_files = function()
 	local modpath = minetest.get_modpath("towntest_chest")
 	local output
 	if os.getenv('HOME')~=nil then 
-		os.execute('\ls -a "'..modpath..'/buildings/" | grep .we > "'..modpath..'/buildings/_buildings.tmp"') -- linux/mac
-		local file, err = io.open(modpath..'/buildings/_buildings.tmp', "rb")
+		os.execute('\ls -a "'..modpath..'/buildings/" | grep .we > "'..modpath..'/buildings/_buildings"') -- linux/mac
+		local file, err = io.open(modpath..'/buildings/_buildings', "rb")
 		if err ~= nil then
 			return
 		end
-		local output = string:split(file:read("*all"), "\n")
+		output = file:lines()
 	else
 		output = io.popen('dir "'..modpath..'\\buildings\\*.we" /b'):lines()  -- windows
 	end
-
     local i, t = 0, {}
     for filename in output do
-	print(filename)
         i = i + 1
         t[i] = filename
     end
@@ -78,50 +74,88 @@ end
 
 -- build
 towntest_chest.build = function(chestpos)
+
+	-- create the npc if needed
+	local k = chestpos.x..","..chestpos.y..","..chestpos.z
+	if not towntest_chest.npc[k] then
+		towntest_chest.npc[k] = minetest.env:add_entity(chestpos, "towntest_npc:builder")
+		towntest_chest.npc[k]:get_luaentity():moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},0,1)
+	end
+	local npc = towntest_chest.npc[k]:get_luaentity()
+
+	-- load the building_plan
 	local meta = minetest.env:get_meta(chestpos)
 	if meta:get_int("building_status")~=1 then return end
 	local inv = meta:get_inventory()
-	local building = towntest_chest.get_table(meta:get_string("building_plan"))
+	local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
 	local materials = {}
-	for i,v in ipairs(building) do
-		-- check if the chest contains the node
-		if inv:contains_item("main", v.name) then
-			-- create the npc
-			local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
-			local k = chestpos.x..","..chestpos.y..","..chestpos.z
-			if not towntest_chest.npc[k] then
-				towntest_chest.npc[k] = minetest.env:add_entity({x=chestpos.x,y=chestpos.y,z=chestpos.z}, "towntest_npc:builder")
-				towntest_chest.npc[k]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},0,1)
-			end
+	
+	-- no building plan
+	if building_plan=="" then
+		-- move the npc to the chest
+		npc:moveto(chestpos,2,2)
+		return
+	end
+	
+	-- try to build from builder inventory
+	for i,v in ipairs(building_plan) do
+		local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
+		-- check if the builder has the node
+		if inv:contains_item("builder", v.name) then
 			-- check if npc is already moving
-			if not towntest_chest.npc[k]:get_luaentity().target then
-				table.remove(building,i)
-				-- move the npc
-				towntest_chest.npc[k]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,function(self,after_param)
+			if not npc.target then
+				table.remove(building_plan,i)
+				-- move the npc to the build area
+				npc:moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,function(self,after_param)
 					-- take from the inv
-					after_param.inv:remove_item("main", after_param.v.name.." 1")
+					after_param.inv:remove_item("builder", after_param.v.name.." 1")
 					after_param.inv:remove_item("needed", after_param.v.name.." 1")
 					-- add the node to the world
 					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
-					-- update the chest building plan
-					meta:set_string("building_plan", towntest_chest.get_string(building))
+					-- update the chest building_plan
+					meta:set_string("building_plan", towntest_chest.get_string(building_plan))
 				end, {pos=pos,v=v,inv=inv,meta=meta})
 			end
-			return true
+			return
 		end
-		-- make a list of materials needed
+	end
+
+	-- make a list of materials needed
+	for i,v in ipairs(building_plan) do
+		local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 		if not materials[v.name] then
 			materials[v.name] = 1
 		else 
 			materials[v.name] = materials[v.name]+1
 		end
 	end
-	-- stop building and tell the player what we need
-	towntest_chest.set_status(meta,0)
-	if #building>0 then
-		minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
-		towntest_chest.update_needed(meta:get_inventory(),building)
+
+	-- try to get items from chest into builder inventory
+	for name,qty in pairs(materials) do
+		-- check if the builder has the node
+		if inv:contains_item("main", name) then
+			-- check if npc is already moving
+			if not npc.target then
+				-- move the npc to the chest
+				npc:moveto(chestpos,2,2,function(self,inv)
+					-- take from the inv
+					for i=1,qty do
+						if inv:contains_item("main",name.." 1") and inv:room_for_item("builder",name.." 1") then
+							inv:add_item("builder",inv:remove_item("main",name.." 1"))
+						end
+					end
+				end, inv)
+			end
+			return true
+		end
 	end
+	
+	-- stop building and tell the player what we need
+	npc:moveto(chestpos,2,2)
+	towntest_chest.set_status(meta,0)
+	minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
+	towntest_chest.update_needed(meta:get_inventory(),building_plan)
+	
 end
 
 -- formspec
@@ -193,14 +227,12 @@ end
 towntest_chest.after_place_node = function(pos,placer)
 	-- setup chest meta and inventory
 	local meta = minetest.env:get_meta(pos)
-	meta:get_inventory():set_size("needed", 8*2)
 	meta:get_inventory():set_size("main", 8)
+	meta:get_inventory():set_size("needed", 8*2)
+	meta:get_inventory():set_size("builder", 2*2)
 	meta:set_string("formspec", towntest_chest.formspec(pos))
 	meta:set_string("infotext", "Building Chest (inactive)")
 	meta:set_string("owner", placer:get_player_name())
-	-- add npc
-	towntest_chest.npc[pos.x..","..pos.y..","..pos.z] = minetest.env:add_entity({x=pos.x,y=pos.y,z=pos.z}, "towntest_npc:builder")
-	towntest_chest.npc[pos.x..","..pos.y..","..pos.z]:get_luaentity():moveto({x=pos.x,y=pos.y+1.5,z=pos.z},0,1)
 end
 
 -- can_dig

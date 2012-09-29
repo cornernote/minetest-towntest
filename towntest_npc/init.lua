@@ -27,13 +27,25 @@ minetest.register_entity("towntest_npc:builder", {
 	
 	get_staticdata = function(self)
 		-- record current game
-		return towntest.game_id
+		return minetest.serialize({game_id=towntest.game_id,chestpos=self.chestpos})
 	end,
 
 	on_activate = function(self, staticdata)
-		-- remove npcs from old game
-		if staticdata~="" and staticdata~=towntest.game_id then
-			self.object:remove()
+		local data = minetest.deserialize(staticdata)
+		-- save chestpos
+		if not self.chestpos then
+			if data and data.chestpos then
+				self.chestpos = data.chestpos
+			else
+				self.chestpos = self.object:getpos()
+			end
+		end
+	end,
+	
+	on_punch = function(self)
+		-- remove npc from the list of npcs when they die
+		if self.object:get_hp() <= 0 and self.chestpos then
+			towntest_chest.npc[self.chestpos.x..","..self.chestpos.y..","..self.chestpos.z] = nil
 		end
 	end,
 
