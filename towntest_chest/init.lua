@@ -24,18 +24,18 @@ towntest_chest.get_files = function(size)
 	local modpath = minetest.get_modpath("towntest_chest")
 	local output
 	if os.getenv('HOME')~=nil then 
-		os.execute('\ls -a "'..directory..'/" | grep .we > "'..modpath..'/buildings/_buildings.tmp"') -- linux/mac
+		os.execute('\ls -a "'..modpath..'/buildings/" | grep .we > "'..modpath..'/buildings/_buildings.tmp"') -- linux/mac
 		local file, err = io.open(modpath..'/buildings/_buildings.tmp', "rb")
 		if err ~= nil then
 			return
 		end
-		local output = file:read("*a"):lines()
+		local output = string:split(file:read("*all"), "\n")
 	else
 		output = io.popen('dir "'..modpath..'\\buildings\\*.we" /b'):lines()  -- windows
 	end
 
     local i, t = 0, {}
-    for i,filename in output do
+    for filename in output do
 	print(filename)
         i = i + 1
         t[i] = filename
