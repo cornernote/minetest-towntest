@@ -89,6 +89,10 @@ end
 -- build
 towntest_chest.build = function(chestpos)
 
+	-- load the building_plan
+	if meta:get_int("building_status")~=1 then return end
+	local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
+
 	-- create the npc if needed
 	local meta = minetest.env:get_meta(chestpos)
 	local inv = meta:get_inventory()
@@ -101,18 +105,15 @@ towntest_chest.build = function(chestpos)
 				inv:set_stack("builder", i, nil)
 			end
 		end
+		towntest_chest.update_needed(meta:get_inventory(),building_plan)
 	end
 	local npc = towntest_chest.npc[k]:get_luaentity()
 
-	-- load the building_plan
-	if meta:get_int("building_status")~=1 then return end
-	local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
-	local materials = {}
-	
 	-- no building plan
 	if building_plan=="" then
 		-- move the npc to the chest
 		npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
+		towntest_chest.set_status(meta,0)
 		return
 	end
 	
@@ -128,7 +129,6 @@ towntest_chest.build = function(chestpos)
 				npc:moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,0,function(self,after_param)
 					-- take from the inv
 					after_param.inv:remove_item("builder", after_param.v.name.." 1")
-					after_param.inv:remove_item("needed", after_param.v.name.." 1")
 					-- add the node to the world
 					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
 					-- update the chest building_plan
@@ -140,6 +140,7 @@ towntest_chest.build = function(chestpos)
 	end
 
 	-- make a list of materials needed
+	local materials = {}
 	for i,v in ipairs(building_plan) do
 		local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 		if not materials[v.name] then
@@ -161,6 +162,7 @@ towntest_chest.build = function(chestpos)
 					for i=1,qty do
 						if inv:contains_item("main",name.." 1") and inv:room_for_item("builder",name.." 1") then
 							inv:add_item("builder",inv:remove_item("main",name.." 1"))
+							inv:remove_item("needed", name.." 1")
 						end
 					end
 				end, inv)
