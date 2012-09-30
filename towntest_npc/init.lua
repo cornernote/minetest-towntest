@@ -27,14 +27,16 @@ minetest.register_entity("towntest_npc:builder", {
 	after = nil,
 	after_param = nil,
 	
+	food = 0,
+	
 	get_staticdata = function(self)
-		-- record current game
-		return minetest.serialize({chestpos=self.chestpos})
+		-- record current chestpos
+		return minetest.serialize({chestpos=self.chestpos,food=self.food})
 	end,
 
 	on_activate = function(self, staticdata)
 		local data = minetest.deserialize(staticdata)
-		-- save chestpos
+		-- load chestpos
 		if data and data.chestpos then
 			local k = data.chestpos.x..","..data.chestpos.y..","..data.chestpos.z
 			if towntest_chest.npc[k] then
@@ -44,6 +46,10 @@ minetest.register_entity("towntest_npc:builder", {
 			self.chestpos = data.chestpos
 		else
 			self.chestpos = self.object:getpos()
+		end
+		-- load food
+		if data and data.food then
+			self.food = data.food
 		end
 	end,
 	
@@ -68,8 +74,12 @@ minetest.register_entity("towntest_npc:builder", {
 			end
 			self.object:setyaw(yaw) -- turn and look in given direction
 
-			local amount = (diff.x^2+diff.y^2+diff.z^2)^0.5
 			local v = self.speed
+			if self.food > 0 then
+				self.food = self.food - dtime
+				v = v*4
+			end
+			local amount = (diff.x^2+diff.y^2+diff.z^2)^0.5
 			local vec = {x=0, y=0, z=0}
 			vec.x = diff.x*v/amount
 			vec.y = diff.y*v/amount

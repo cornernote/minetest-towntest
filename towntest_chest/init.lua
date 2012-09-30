@@ -123,7 +123,7 @@ towntest_chest.build = function(chestpos)
 		-- check if the builder has the node
 		if inv:contains_item("builder", v.name) then
 			-- check if npc is already moving
-			if not npc.target then
+			if npc and not npc.target then
 				table.remove(building_plan,i)
 				-- move the npc to the build area
 				npc:moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,0,function(self,after_param)
@@ -139,43 +139,56 @@ towntest_chest.build = function(chestpos)
 		end
 	end
 
-	-- make a list of materials needed
-	local materials = {}
+	-- try to get items from chest into builder inventory
+	local items_needed = true
 	for i,v in ipairs(building_plan) do
-		local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
-		if not materials[v.name] then
-			materials[v.name] = 1
-		else 
-			materials[v.name] = materials[v.name]+1
+		-- check if the chest has the node
+		if inv:contains_item("main", v.name) then
+			items_needed = false
+			-- check if npc is already moving
+			if npc and not npc.target then
+				-- move the npc to the chest
+				npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,0,0,function(self,params)
+					-- check for food
+					local inv = params.inv
+					local building_plan = params.building_plan
+					if not inv:is_empty("main") then
+						for i=1,inv:get_size("main") do
+							-- check if this is a food, if so take it
+							local stack = inv:get_stack("main", i)
+							if not stack:is_empty() then
+								local node = minetest.registered_nodes[stack:get_name()]
+								if node.name == "default:apple" then
+									local quality = 1
+									npc.food = npc.food + (stack:get_count() * quality * 4)
+									inv:set_stack("main", i, nil)
+								elseif node.groups.food ~= nil then
+									local quality = 4 - node.groups.food
+									npc.food = npc.food + (stack:get_count() * quality * 4)
+									inv:set_stack("main", i, nil)
+								end
+							end
+						end
+					end
+					-- take from the inv
+					for i,v in ipairs(building_plan) do
+						if inv:contains_item("main",v.name.." 1") and inv:room_for_item("builder",v.name.." 1") then
+							inv:add_item("builder",inv:remove_item("main",v.name.." 1"))
+							inv:remove_item("needed", v.name.." 1")
+						end
+					end
+				end, {inv=inv,building_plan=building_plan})
+			end
 		end
 	end
 
-	-- try to get items from chest into builder inventory
-	for name,qty in pairs(materials) do
-		-- check if the builder has the node
-		if inv:contains_item("main", name) then
-			-- check if npc is already moving
-			if not npc.target then
-				-- move the npc to the chest
-				npc:moveto(chestpos,2,2,2,function(self,inv)
-					-- take from the inv
-					for i=1,qty do
-						if inv:contains_item("main",name.." 1") and inv:room_for_item("builder",name.." 1") then
-							inv:add_item("builder",inv:remove_item("main",name.." 1"))
-							inv:remove_item("needed", name.." 1")
-						end
-					end
-				end, inv)
-			end
-			return true
-		end
-	end
-	
 	-- stop building and tell the player what we need
-	npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
-	towntest_chest.set_status(meta,0)
-	minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
-	towntest_chest.update_needed(meta:get_inventory(),building_plan)
+	if npc and items_needed then
+		npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
+		towntest_chest.set_status(meta,0)
+		minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
+		towntest_chest.update_needed(meta:get_inventory(),building_plan)
+	end
 	
 end
 
@@ -314,14 +327,20 @@ minetest.register_node("towntest_chest:chest", {
 	end,
 	allow_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
 		if from_list=="needed" or to_list=="needed" then return 0 end
+		if from_list=="builder" or to_list=="builder" then return 0 end
+		if from_list=="lumberjack" or to_list=="lumberjack" then return 0 end
 		return count
 	end,
 	allow_metadata_inventory_put = function(pos, listname, index, stack, player)
 		if listname=="needed" then return 0 end
+		if listname=="builder" then return 0 end
+		if listname=="lumberjack" then return 0 end
 		return stack:get_count()
 	end,
 	allow_metadata_inventory_take = function(pos, listname, index, stack, player)
 		if listname=="needed" then return 0 end
+		if listname=="builder" then return 0 end
+		if listname=="lumberjack" then return 0 end
 		return stack:get_count()
 	end,
 })
