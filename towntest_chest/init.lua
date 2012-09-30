@@ -10,7 +10,7 @@ CHEST
 
 ]]--
 
-	
+
 -- expose api
 towntest_chest = {}
 
@@ -90,11 +90,11 @@ end
 towntest_chest.build = function(chestpos)
 
 	-- load the building_plan
+	local meta = minetest.env:get_meta(chestpos)
 	if meta:get_int("building_status")~=1 then return end
 	local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
 
 	-- create the npc if needed
-	local meta = minetest.env:get_meta(chestpos)
 	local inv = meta:get_inventory()
 	local k = chestpos.x..","..chestpos.y..","..chestpos.z
 	if not towntest_chest.npc[k] then
