@@ -198,7 +198,7 @@ towntest_chest.formspec = function(pos,page)
 			.."list[current_name;builder;8.5,0.5;2,2;]"
 
 			.."label[8.5,2.5; lumberjack:]"
-			.."list[current_name;lumberjack;8.5,3.5;2,2;]"
+			.."list[current_name;lumberjack;8.5,3;2,2;]"
 			
 		return formspec
 	end
@@ -301,6 +301,11 @@ minetest.register_node("towntest_chest:chest", {
 	after_place_node = towntest_chest.after_place_node,
 	on_receive_fields = towntest_chest.on_receive_fields,
 	can_dig = towntest_chest.can_dig,
+	after_dig_node = function(pos, oldnode, oldmetadata, digger)
+		local k = pos.x..","..pos.y..","..pos.z
+		towntest_chest.npc[k]:remove()
+		towntest_chest.npc[k] = nil
+	end,
 	on_punch = function(pos)
 		towntest_chest.set_status(minetest.env:get_meta(pos))
 	end,
