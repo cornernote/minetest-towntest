@@ -10,70 +10,65 @@ NPCs
 
 ]]--
 
-function x(val) 
- return ((val -80) / 160)
+local visual, visual_size, textures
+if minetest.setting_getbool("3d_models") then
+	function x(val) return ((val -80) / 160) end
+	function z(val) return ((val -80) / 160) end
+	function y(val) return ((val + 80) / 160) end
+	local textures = {
+		"towntest_npc_builder_bottom.png",
+		"towntest_npc_builder_top.png",
+		"towntest_npc_builder_back.png",
+		"towntest_npc_builder_front.png",
+		"towntest_npc_builder_right.png",
+		"towntest_npc_builder_left.png",
+	}
+	local nodebox ={
+		--head
+		{x(95),y(-10), z(65), x(65), y(-40), z(95)},
+		--neck
+		{x(90),y(-40),z(70) , x(70), y(-50),z(90) },
+		--body
+		{x(90),y(-50), z(60), x(70), y(-100), z(100)},
+		--legs
+		{x(90),y(-100), z(60),x(70), y(-160),z(79) },
+		{x(90),y(-100), z(81),x(70), y(-160), z(100)},
+		--shoulders
+		{x(89),y(-50), z(58), x(71),y(-68),z(60)},
+		{x(89),y(-50), z(100),x(71) ,y(-68),z(102)},
+		--left arm
+		{x(139),y(-50),z(45),x(71),y(-63),z(58)},
+		--right arm
+		{x(89),y(-50),z(102),x(71),y(-100),z(115)},
+		{x(115),y(-87),z(102),x(71),y(-100),z(115)},
+	}
+	minetest.register_node("towntest_npc:builder_box", {
+		tiles = textures,
+		drawtype = "nodebox",
+		node_box = {
+			type = "fixed",
+			fixed = nodebox
+		},
+	})
+	visual = "wielditem"
+	visual_size = nil
+	textures = {"towntest_npc:builder_box"}
+else
+	visual = "upright_sprite"
+	visual_size = {x=1, y=2}
+	textures = {"towntest_npc_builder_sprite_front.png", "towntest_npc_builder_sprite_back.png"}
 end
 
-function z(val) 
- return ((val -80) / 160)
-end
-
-function y(val)
-	return ((val + 80) / 160)
-end
-
-local textures = {
-	"towntest_npc_builder_bottom.png",
-	"towntest_npc_builder_top.png",
-	"towntest_npc_builder_back.png",
-	"towntest_npc_builder_front.png",
-	"towntest_npc_builder_right.png",
-	"towntest_npc_builder_left.png",
-}
-
-local nodebox ={
-	--head
-	{x(95),y(-10), z(65), x(65), y(-40), z(95)},
-
-	--neck
-	{x(90),y(-40),z(70) , x(70), y(-50),z(90) },
-
-	--body
-	{x(90),y(-50), z(60), x(70), y(-100), z(100)},
-
-	--legs
-	{x(90),y(-100), z(60),x(70), y(-160),z(79) },
-	{x(90),y(-100), z(81),x(70), y(-160), z(100)},
-
-	--shoulders
-	{x(89),y(-50), z(58), x(71),y(-68),z(60)},
-	{x(89),y(-50), z(100),x(71) ,y(-68),z(102)},
-
-	--left arm
-	{x(139),y(-50),z(45),x(71),y(-63),z(58)},
-
-	--right arm
-	{x(89),y(-50),z(102),x(71),y(-100),z(115)},
-	{x(115),y(-87),z(102),x(71),y(-100),z(115)},
-
-}
-
-minetest.register_node("towntest_npc:builder_box", {
-	tiles = textures,
-	drawtype = "nodebox",
-	node_box = {
-		type = "fixed",
-		fixed = nodebox
-	},
-})
 
 minetest.register_entity("towntest_npc:builder", {
 	hp_max = 1,
 	physical = false,
-	collisionbox = {-0.4, -1, -0.4, 0.4, 1, 0.4},
-	visual = "wielditem",
-	textures = {"towntest_npc:builder_box"},
 	makes_footstep_sound = true,
+	collisionbox = {-0.4, -1, -0.4, 0.4, 1, 0.4},
+
+	visual_size = visual_size,
+	visual = visual,
+	textures = textures,
 
 	target = nil,
 	speed = nil,
