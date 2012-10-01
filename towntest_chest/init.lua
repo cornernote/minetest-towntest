@@ -17,7 +17,8 @@ towntest_chest = {}
 -- table of non playing characters
 towntest_chest.npc = {}
 
--- get_files
+-- get_files 
+-- returns a table containing buildings
 towntest_chest.get_files = function()
 	local modpath = minetest.get_modpath("towntest_chest")
 	local output
@@ -40,6 +41,8 @@ towntest_chest.get_files = function()
 end
 
 -- load
+-- filename - the building file to load
+-- return - string containing the pos and nodes to build
 towntest_chest.load = function(filename)
 	local filepath = minetest.get_modpath("towntest_chest").."/buildings/"..filename
 	local file, err = io.open(filepath, "rb")
@@ -66,7 +69,9 @@ towntest_chest.load = function(filename)
 	return towntest_chest.get_string(building)
 end
 
--- get_table
+-- get_table - convert building table to string
+-- building_string - string containing pos and nodes to build
+-- return - table containing pos and nodes to build
 towntest_chest.get_table = function(building_string)
 	local building = {}
 	for x, y, z, name, param1, param2 in building_string:gmatch("([+-]?%d+)%s+([+-]?%d+)%s+([+-]?%d+)%s+([^%s]+)%s+(%d+)%s+(%d+)[^\r\n]*[\r\n]*") do
@@ -77,7 +82,9 @@ towntest_chest.get_table = function(building_string)
 	return building
 end
 
--- get_string
+-- get_string - convert building string to table
+-- building - table containing pos and nodes to build
+-- return - string containing pos and nodes to build
 towntest_chest.get_string = function(building)
 	local building_string = ""
 	for i,v in ipairs(building) do
@@ -86,7 +93,45 @@ towntest_chest.get_string = function(building)
 	return building_string
 end
 
--- build
+-- update_needed - updates the needed inventory in the chest
+-- inv - inventory object of the chest
+-- building - table containing pos and nodes to build 
+towntest_chest.update_needed = function(inv,building)
+	for i=1,inv:get_size("needed") do
+		inv:set_stack("needed", i, nil)
+	end
+	local materials = {}
+	for i,v in ipairs(building) do
+		if not materials[v.name] then
+			materials[v.name] = 1
+		else 
+			materials[v.name] = materials[v.name]+1
+		end
+	end
+	for k,v in pairs(materials) do
+		inv:add_item("needed",k.." "..v)
+	end
+end
+
+-- set_status - activate or deactivate building
+-- meta - meta object of the chest
+-- status - integer (will toggle if status not given)
+towntest_chest.set_status = function(meta,status)
+	if status==nil then
+		status=meta:get_int("building_status")
+		if status==1 then status=0 else status=1 end
+	end
+	if status==0 then
+		meta:set_string("infotext", "Building Chest (inactive)")
+		meta:set_int("building_status",0)
+	else
+		meta:set_string("infotext", "Building Chest (active)")
+		meta:set_int("building_status",1)
+	end
+end
+
+-- build - build a node of the structure
+-- chestpos - the position of the chest containing the instructions
 towntest_chest.build = function(chestpos)
 
 	-- load the building_plan
@@ -186,13 +231,12 @@ towntest_chest.build = function(chestpos)
 	if npc and items_needed then
 		npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
 		towntest_chest.set_status(meta,0)
-		minetest.chat_send_player(meta:get_string("owner"), "[towntest_chest] materials not found in chest")
 		towntest_chest.update_needed(meta:get_inventory(),building_plan)
 	end
 	
 end
 
--- formspec
+-- formspec - get the chest formspec
 towntest_chest.formspec = function(pos,page)
 	local formspec = ""
 	-- chest page
@@ -238,7 +282,7 @@ towntest_chest.formspec = function(pos,page)
 	return formspec
 end
 
--- on_receive_fields
+-- on_receive_fields - called when a chest button is submitted
 towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	local meta = minetest.env:get_meta(pos)
 	if fields.building then
@@ -248,26 +292,8 @@ towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	end
 end
 
--- update_needed
-towntest_chest.update_needed = function(inv,building)
-	for i=1,inv:get_size("needed") do
-		inv:set_stack("needed", i, nil)
-	end
-	local materials = {}
-	for i,v in ipairs(building) do
-		if not materials[v.name] then
-			materials[v.name] = 1
-		else 
-			materials[v.name] = materials[v.name]+1
-		end
-	end
-	for k,v in pairs(materials) do
-		inv:add_item("needed",k.." "..v)
-	end
-end
-
--- after_place_node
-towntest_chest.after_place_node = function(pos,placer)
+-- on_construct
+towntest_chest.on_construct = function(pos)
 	-- setup chest meta and inventory
 	local meta = minetest.env:get_meta(pos)
 	meta:get_inventory():set_size("main", 8)
@@ -275,31 +301,7 @@ towntest_chest.after_place_node = function(pos,placer)
 	meta:get_inventory():set_size("builder", 2*2)
 	meta:get_inventory():set_size("lumberjack", 2*2)
 	meta:set_string("formspec", towntest_chest.formspec(pos))
-	meta:set_string("infotext", "Building Chest (inactive)")
-	meta:set_string("owner", placer:get_player_name())
-end
-
--- can_dig
-towntest_chest.can_dig = function(pos,player)
-	if not minetest.env:get_meta(pos):get_inventory():is_empty("main") then
-		return false
-	end
-	return true
-end
-
--- set_status (or toggle if status not given)
-towntest_chest.set_status = function(meta,status)
-	if status==nil then
-		status=meta:get_int("building_status")
-		if status==1 then status=0 else status=1 end
-	end
-	if status==0 then
-		meta:set_string("infotext", "Building Chest (inactive)")
-		meta:set_int("building_status",0)
-	else
-		meta:set_string("infotext", "Building Chest (active)")
-		meta:set_int("building_status",1)
-	end
+	towntest_chest.set_status(meta, 1)
 end
 
 -- register_node - the chest where you put the items
@@ -311,9 +313,8 @@ minetest.register_node("towntest_chest:chest", {
 	groups = {snappy=2,choppy=2,oddly_breakable_by_hand=2},
 	legacy_facedir_simple = true,
 	sounds = default.node_sound_wood_defaults(),
-	after_place_node = towntest_chest.after_place_node,
+	on_construct = towntest_chest.on_construct,
 	on_receive_fields = towntest_chest.on_receive_fields,
-	can_dig = towntest_chest.can_dig,
 	after_dig_node = function(pos, oldnode, oldmetadata, digger)
 		local k = pos.x..","..pos.y..","..pos.z
 		towntest_chest.npc[k]:remove()
@@ -345,13 +346,26 @@ minetest.register_node("towntest_chest:chest", {
 	end,
 })
 
--- register_abm
+-- register_abm - builds the building
 minetest.register_abm({
 	nodenames = {"towntest_chest:chest"},
 	interval = 0.5,
 	chance = 1,
 	action = towntest_chest.build,
 })
+
+-- register_on_generated - spawns the chest
+minetest.register_on_generated(function(minp, maxp, blockseed)
+	if math.random(1, 100) ~= 1 then
+		return
+	end
+	local tmp = {x=(maxp.x-minp.x)/2+minp.x, y=(maxp.y-minp.y)/2+minp.y, z=(maxp.z-minp.z)/2+minp.z}
+	local pos = minetest.env:find_node_near(tmp, maxp.x-minp.x, {"default:dirt_with_grass"})
+	if pos ~= nil then
+		minetest.env:set_node({x=pos.x, y=pos.y+1, z=pos.z}, {name="towntest_chest:chest"})
+		print("chest added at "..dump(pos))
+	end
+end)
 
 -- log that we started
 minetest.log("action", "[MOD]"..minetest.get_current_modname().." -- loaded from "..minetest.get_modpath(minetest.get_current_modname()))
