@@ -90,7 +90,7 @@ minetest.register_entity("towntest_npc:builder", {
 		if data and data.chestpos then
 			local k = data.chestpos.x..","..data.chestpos.y..","..data.chestpos.z
 			if towntest_chest.npc[k] then
-				towntest_chest.npc[k].object:remove()
+				towntest_chest.npc[k]:remove()
 			end
 			towntest_chest.npc[k] = self.object
 			self.chestpos = data.chestpos
