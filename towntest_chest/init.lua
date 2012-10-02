@@ -356,7 +356,7 @@ minetest.register_abm({
 
 -- register_on_generated - spawns the chest
 minetest.register_on_generated(function(minp, maxp, blockseed)
-	if math.random(1, 100) ~= 1 then
+	if math.random(1, 10) ~= 1 then
 		return
 	end
 	local tmp = {x=(maxp.x-minp.x)/2+minp.x, y=(maxp.y-minp.y)/2+minp.y, z=(maxp.z-minp.z)/2+minp.z}
