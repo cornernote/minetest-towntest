@@ -144,6 +144,7 @@ towntest_chest.build = function(chestpos)
 	local k = chestpos.x..","..chestpos.y..","..chestpos.z
 	if not towntest_chest.npc[k] then
 		towntest_chest.npc[k] = minetest.env:add_entity(chestpos, "towntest_npc:builder")
+		towntest_chest.npc[k]:get_luaentity().chestpos = chestpos
 		towntest_chest.npc[k]:get_luaentity():moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},1)
 		if not inv:is_empty("builder") then
 			for i=1,inv:get_size("builder") do

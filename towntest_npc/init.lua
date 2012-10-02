@@ -78,8 +78,10 @@ minetest.register_entity("towntest_npc:builder", {
 	food = 0,
 	
 	get_staticdata = function(self)
-		-- record current chestpos
-		return minetest.serialize({chestpos=self.chestpos,food=self.food})
+		return minetest.serialize({
+			chestpos = self.chestpos,
+			food = self.food,
+		})
 	end,
 
 	on_activate = function(self, staticdata)
@@ -88,12 +90,10 @@ minetest.register_entity("towntest_npc:builder", {
 		if data and data.chestpos then
 			local k = data.chestpos.x..","..data.chestpos.y..","..data.chestpos.z
 			if towntest_chest.npc[k] then
-				self.object:remove()
+				towntest_chest.npc[k].object:remove()
 			end
 			towntest_chest.npc[k] = self.object
 			self.chestpos = data.chestpos
-		else
-			self.chestpos = self.object:getpos()
 		end
 		-- load food
 		if data and data.food then
@@ -109,6 +109,11 @@ minetest.register_entity("towntest_npc:builder", {
 	end,
 
 	on_step = function(self, dtime)
+	
+		-- remove
+		if not self.chestpos then
+			self.object:remove()
+		end
 
 		-- moveto
 		if self.target and self.speed then
