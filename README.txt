@@ -4,7 +4,15 @@ Towntest for Minetest
 
 Copyright (c) 2012 cornernote, Brett O'Donnell <cornernote@gmail.com>
 Source Code: https://github.com/cornernote/minetest-towntest
-Contributors: PilzAdam
+
+Contributors: 
+PilzAdam - made the initial NPC entity movement code
+VanessaE - contributed buildings
+kddekadenz - contributed buildings
+ACDC - contributed buildings
+Nanuk - contributed buildings
+irksomeduck - contributed buildings
+
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.
 
@@ -28,3 +36,4 @@ more buildings can be added to the buildings folder and will be automatically ad
 
 Future features:
 - more NPCs - miners, lumberjacks, crafters
+
