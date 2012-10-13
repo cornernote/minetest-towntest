@@ -318,7 +318,9 @@ minetest.register_node("towntest_chest:chest", {
 	on_receive_fields = towntest_chest.on_receive_fields,
 	after_dig_node = function(pos, oldnode, oldmetadata, digger)
 		local k = pos.x..","..pos.y..","..pos.z
-		towntest_chest.npc[k]:remove()
+		if towntest_chest.npc[k] then
+			towntest_chest.npc[k]:remove()
+		end
 		towntest_chest.npc[k] = nil
 	end,
 	on_punch = function(pos)
