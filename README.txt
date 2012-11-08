@@ -4,6 +4,7 @@ Towntest for Minetest
 
 Copyright (c) 2012 cornernote, Brett O'Donnell <cornernote@gmail.com>
 Source Code: https://github.com/cornernote/minetest-towntest
+Home Page: https://sites.google.com/site/cornernote/minetest/towntest
 
 Contributors: 
 PilzAdam - made the initial NPC entity movement code
