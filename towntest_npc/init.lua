@@ -4,7 +4,7 @@ Towntest for Minetest
 
 Copyright (c) 2012 cornernote, Brett O'Donnell <cornernote@gmail.com>
 Source Code: https://github.com/cornernote/minetest-towntest
-License: GPLv3
+License: BSD-3-Clause https://raw.github.com/cornernote/minetest-towntest/master/LICENSE
 
 NPCs
 
