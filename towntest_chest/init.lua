@@ -23,7 +23,7 @@ towntest_chest.get_files = function()
 	local modpath = minetest.get_modpath("towntest_chest")
 	local output
 	if os.getenv('HOME')~=nil then 
-		os.execute('\ls -a "'..modpath..'/buildings/" | grep .we > "'..modpath..'/buildings/_buildings"') -- linux/mac
+		os.execute('ls -a "'..modpath..'/buildings/" | grep .we > "'..modpath..'/buildings/_buildings"') -- linux/mac
 		local file, err = io.open(modpath..'/buildings/_buildings', "rb")
 		if err ~= nil then
 			return
