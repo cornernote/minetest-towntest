@@ -11,7 +11,7 @@ NPCs
 ]]--
 
 local visual, visual_size, textures
-if minetest.setting_getbool("3d_models") then
+-- if minetest.setting_getbool("3d_models") then
 	function x(val) return ((val -80) / 160) end
 	function z(val) return ((val -80) / 160) end
 	function y(val) return ((val + 80) / 160) end
@@ -51,11 +51,12 @@ if minetest.setting_getbool("3d_models") then
 	visual = "wielditem"
 	visual_size = nil
 	textures = {"towntest_npc:builder_box"}
-else
-	visual = "upright_sprite"
-	visual_size = {x=1, y=2}
-	textures = {"towntest_npc_builder_sprite_front.png", "towntest_npc_builder_sprite_back.png"}
-end
+-- 2dmodel
+--else
+--	visual = "upright_sprite"
+--	visual_size = {x=1, y=2}
+--	textures = {"towntest_npc_builder_sprite_front.png", "towntest_npc_builder_sprite_back.png"}
+--end
 
 
 minetest.register_entity("towntest_npc:builder", {
