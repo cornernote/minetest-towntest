@@ -13,7 +13,7 @@ Grow a town in minetest.
 
 - **[Documentation](http://cornernote.github.io/minetest-towntest)**
 - **[GitHub Project](https://github.com/cornernote/minetest-towntest)**
-- **[Minetest Forum](http://minetest.net/forum/viewtopic.php?id=3223)**
+- **[Minetest Forum](https://forum.minetest.net/viewtopic.php?id=3223)**
 
 
 ## Support
