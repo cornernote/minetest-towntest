@@ -10,6 +10,7 @@ CHEST
 
 ]]--
 
+local modpath = minetest.get_modpath(minetest.get_current_modname())
 
 -- expose api
 towntest_chest = {}
@@ -20,31 +21,22 @@ towntest_chest.npc = {}
 -- get_files 
 -- returns a table containing buildings
 towntest_chest.get_files = function()
-	local modpath = minetest.get_modpath("towntest_chest")
-	local output
-	if os.getenv('HOME')~=nil then 
-		os.execute('ls -a "'..modpath..'/buildings/" | grep .we > "'..modpath..'/buildings/_buildings"') -- linux/mac
-		local file, err = io.open(modpath..'/buildings/_buildings', "rb")
-		if err ~= nil then
-			return
+	local lfs = require("lfs")
+	local i, t = 0, {}
+	for filename in lfs.dir(modpath .. "/buildings") do
+		if filename ~= "." and filename ~= ".." then
+			i = i + 1
+			t[i] = filename
 		end
-		output = file:lines()
-	else
-		output = io.popen('dir "'..modpath..'\\buildings\\*.we" /b'):lines()  -- windows
 	end
-    local i, t = 0, {}
-    for filename in output do
-        i = i + 1
-        t[i] = filename
-    end
-    return t
+	return t
 end
 
 -- load
 -- filename - the building file to load
 -- return - string containing the pos and nodes to build
 towntest_chest.load = function(filename)
-	local filepath = minetest.get_modpath("towntest_chest").."/buildings/"..filename
+	local filepath = modpath.."/buildings/"..filename
 	local file, err = io.open(filepath, "rb")
 	if err ~= nil then
 		minetest.chat_send_player(placer:get_player_name(), "[towntest_chest] error: could not open file \"" .. filepath .. "\"")
@@ -133,7 +125,6 @@ end
 -- build - build a node of the structure
 -- chestpos - the position of the chest containing the instructions
 towntest_chest.build = function(chestpos)
-
 	-- load the building_plan
 	local meta = minetest.env:get_meta(chestpos)
 	if meta:get_int("building_status")~=1 then return end
@@ -172,14 +163,14 @@ towntest_chest.build = function(chestpos)
 			if npc and not npc.target then
 				table.remove(building_plan,i)
 				-- move the npc to the build area
-				npc:moveto({x=pos.x,y=pos.y+1.5,z=pos.z},2,2,0,function(self,after_param)
+				npc:moveto({x=pos.x, y=pos.y+1.5, z=pos.z}, 2, 2, 0, function(self,after_param)
 					-- take from the inv
 					after_param.inv:remove_item("builder", after_param.v.name.." 1")
 					-- add the node to the world
 					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
 					-- update the chest building_plan
 					meta:set_string("building_plan", towntest_chest.get_string(building_plan))
-				end, {pos=pos,v=v,inv=inv,meta=meta})
+				end, {pos=pos, v=v, inv=inv, meta=meta})
 			end
 			return
 		end
@@ -194,7 +185,7 @@ towntest_chest.build = function(chestpos)
 			-- check if npc is already moving
 			if npc and not npc.target then
 				-- move the npc to the chest
-				npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,0,0,function(self,params)
+				npc:moveto({x=chestpos.x, y=chestpos.y+1.5, z=chestpos.z}, 2, 0, 0, function(self, params)
 					-- check for food
 					local inv = params.inv
 					local building_plan = params.building_plan
@@ -261,8 +252,7 @@ towntest_chest.formspec = function(pos,page)
 		return formspec
 	end
 	-- main page
-	formspec = formspec 
-		.."size[12,10]"
+	formspec = formspec.."size[12,10]"
 	local pages = towntest_chest.get_files()
 	local x,y = 0,0
 	local p
@@ -301,7 +291,7 @@ towntest_chest.on_construct = function(pos)
 	meta:get_inventory():set_size("needed", 8*2)
 	meta:get_inventory():set_size("builder", 2*2)
 	meta:get_inventory():set_size("lumberjack", 2*2)
-	meta:set_string("formspec", towntest_chest.formspec(pos))
+	meta:set_string("formspec", towntest_chest.formspec(pos, ""))
 	towntest_chest.set_status(meta, 1)
 end
 
@@ -357,18 +347,6 @@ minetest.register_abm({
 	action = towntest_chest.build,
 })
 
--- register_on_generated - spawns the chest
-minetest.register_on_generated(function(minp, maxp, blockseed)
-	if math.random(1, 10) ~= 1 then
-		return
-	end
-	local tmp = {x=(maxp.x-minp.x)/2+minp.x, y=(maxp.y-minp.y)/2+minp.y, z=(maxp.z-minp.z)/2+minp.z}
-	local pos = minetest.env:find_node_near(tmp, maxp.x-minp.x, {"default:dirt_with_grass"})
-	if pos ~= nil then
-		minetest.env:set_node({x=pos.x, y=pos.y+1, z=pos.z}, {name="towntest_chest:chest"})
-		print("chest added at "..dump(pos))
-	end
-end)
-
 -- log that we started
-minetest.log("action", "[MOD]"..minetest.get_current_modname().." -- loaded from "..minetest.get_modpath(minetest.get_current_modname()))
+minetest.log("action", "[MOD]"..minetest.get_current_modname().." -- loaded from "..modpath)
+
