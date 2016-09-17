@@ -404,6 +404,16 @@ minetest.register_abm({
 	action = towntest_chest.build,
 })
 
+
+minetest.register_craft({
+        output = 'towntest_chest:chest',
+        recipe = {
+                {'default:mese_crystal', 'default:chest_locked', 'default:mese_crystal'},
+                {'default:book', 'default:diamond',    'default:book'},
+                {'default:mese_crystal', 'default:chest_locked', 'default:mese_crystal'},
+        }
+})
+
 -- log that we started
 minetest.log("action", "[MOD]"..minetest.get_current_modname().." -- loaded from "..modpath)
 
