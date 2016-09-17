@@ -61,14 +61,62 @@ towntest_chest.load = function(filename)
 	return towntest_chest.get_string(building)
 end
 
+
+local function mapname(name)
+	local node = minetest.registered_items[name]
+
+	if not node then
+		minetest.log("info", "unknown node in building: "..name)
+		return nil
+	else
+
+-- known node. Check for price or if it is free
+		if (node.groups.not_in_creative_inventory and not (node.groups.not_in_creative_inventory == 0)) or
+		   (not node.description or node.description == "") then
+			if node.drop then
+				return mapname(node.drop) --use the drop as payment
+			else --something not supported, but known
+				return "free" -- will be build for free. they are something like doors:hidden or second part of coffee lrfurn:coffeetable_back
+			end
+		else
+			return node.name
+		end
+	end
+end
+
 -- get_table - convert building table to string
 -- building_string - string containing pos and nodes to build
 -- return - table containing pos and nodes to build
 towntest_chest.get_table = function(building_string)
 	local building = {}
-	for x, y, z, name, param1, param2 in building_string:gmatch("([+-]?%d+)%s+([+-]?%d+)%s+([+-]?%d+)%s+([^%s]+)%s+(%d+)%s+(%d+)[^\r\n]*[\r\n]*") do
-		if tonumber(x)~=0 or tonumber(y)~=0 or tonumber(z)~=0 then
-			table.insert(building, {x=x,y=y,z=z,name=name,param1=param1,param2=param2})
+        local wefile = {}
+	local idx, def
+	local retpos = string.find(string.sub(building_string,0,10), "return")
+	if retpos then
+		local exe, err, ok
+		exe,err = loadstring(string.sub(building_string,retpos))
+		if exe then
+			ok, wefile = pcall(exe)
+		end
+		
+		for idx,def in pairs(wefile) do
+			if tonumber(def.x)~=0 or tonumber(def.y)~=0 or tonumber(def.z)~=0 then
+				if not def.matname then
+					def.matname = mapname(def.name)
+				end
+				if def.matname then -- found
+					table.insert(building, {x=def.x,y=def.y,z=def.z,name=def.name,param1=def.param1,param2=def.param2,meta=def.meta,matname=def.matname})
+				end
+			end
+		end
+	else
+		for x, y, z, name, param1, param2 in building_string:gmatch("([+-]?%d+)%s+([+-]?%d+)%s+([+-]?%d+)%s+([^%s]+)%s+(%d+)%s+(%d+)[^\r\n]*[\r\n]*") do
+			if tonumber(x)~=0 or tonumber(y)~=0 or tonumber(z)~=0 then
+				local matname = mapname(name)
+				if def.matname then 
+					table.insert(building, {x=x,y=y,z=z,name=name,param1=param1,param2=param2,matname=matname})
+				end
+			end
 		end
 	end
 	return building
@@ -79,8 +127,8 @@ end
 -- return - string containing pos and nodes to build
 towntest_chest.get_string = function(building)
 	local building_string = ""
-	for i,v in ipairs(building) do
-		building_string = building_string..v.x.." "..v.y.." "..v.z.." "..v.name.." "..v.param1.." "..v.param2.."\n"
+	if building_string then
+		building_string = "return "..dump(building)
 	end
 	return building_string
 end
@@ -94,10 +142,12 @@ towntest_chest.update_needed = function(inv,building)
 	end
 	local materials = {}
 	for i,v in ipairs(building) do
-		if not materials[v.name] then
-			materials[v.name] = 1
-		else 
-			materials[v.name] = materials[v.name]+1
+		if v.matname ~= "free" then --free materials will be built for free
+			if not materials[v.matname] then
+				materials[v.matname] = 1
+			else 
+				materials[v.matname] = materials[v.matname]+1
+			end
 		end
 	end
 	for k,v in pairs(materials) do
@@ -158,16 +208,23 @@ towntest_chest.build = function(chestpos)
 	for i,v in ipairs(building_plan) do
 		local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 		-- check if the builder has the node
-		if inv:contains_item("builder", v.name) then
+		if inv:contains_item("builder", v.matname) or -- is payed or
+-- for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
+		   ( v.matname == "free" and i == #building_plan )
+		then
 			-- check if npc is already moving
 			if npc and not npc.target then
 				table.remove(building_plan,i)
 				-- move the npc to the build area
 				npc:moveto({x=pos.x, y=pos.y+1.5, z=pos.z}, 2, 2, 0, function(self,after_param)
 					-- take from the inv
-					after_param.inv:remove_item("builder", after_param.v.name.." 1")
+					after_param.inv:remove_item("builder", after_param.v.matname.." 1")
 					-- add the node to the world
 					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
+			                if v.meta then
+						minetest.env:get_meta(after_param.pos):from_table(after_param.v.meta)
+			                end
+
 					-- update the chest building_plan
 					meta:set_string("building_plan", towntest_chest.get_string(building_plan))
 				end, {pos=pos, v=v, inv=inv, meta=meta})
@@ -180,7 +237,7 @@ towntest_chest.build = function(chestpos)
 	local items_needed = true
 	for i,v in ipairs(building_plan) do
 		-- check if the chest has the node
-		if inv:contains_item("main", v.name) then
+		if inv:contains_item("main", v.matname) then
 			items_needed = false
 			-- check if npc is already moving
 			if npc and not npc.target then
@@ -195,11 +252,11 @@ towntest_chest.build = function(chestpos)
 							local stack = inv:get_stack("main", i)
 							if not stack:is_empty() then
 								local node = minetest.registered_nodes[stack:get_name()]
-								if node.name == "default:apple" then
+								if node and node.name == "default:apple" then
 									local quality = 1
 									npc.food = npc.food + (stack:get_count() * quality * 4)
 									inv:set_stack("main", i, nil)
-								elseif node.groups.food ~= nil then
+								elseif node and node.groups.food ~= nil then
 									local quality = 4 - node.groups.food
 									npc.food = npc.food + (stack:get_count() * quality * 4)
 									inv:set_stack("main", i, nil)
@@ -209,9 +266,9 @@ towntest_chest.build = function(chestpos)
 					end
 					-- take from the inv
 					for i,v in ipairs(building_plan) do
-						if inv:contains_item("main",v.name.." 1") and inv:room_for_item("builder",v.name.." 1") then
-							inv:add_item("builder",inv:remove_item("main",v.name.." 1"))
-							inv:remove_item("needed", v.name.." 1")
+						if inv:contains_item("main",v.matname.." 1") and inv:room_for_item("builder",v.matname.." 1") then
+							inv:add_item("builder",inv:remove_item("main",v.matname.." 1"))
+							inv:remove_item("needed", v.matname.." 1")
 						end
 					end
 				end, {inv=inv,building_plan=building_plan})
