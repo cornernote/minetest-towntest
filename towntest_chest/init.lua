@@ -29,6 +29,7 @@ towntest_chest.get_files = function()
 			t[i] = filename
 		end
 	end
+	table.sort(t,function(a,b) return a<b end)
 	return t
 end
 
@@ -49,6 +50,25 @@ end
 
 
 local function mapname(name)
+-- no name given - something wrong
+	if not name then
+		return nil
+	end
+
+-- item table (can be happen in drops). Search for the first valid one
+	if type(name) == "table" then -- drop table. Search for "any payment"
+		for _, namex in pairs(name) do
+			print("name:", namex, "_", _)
+			local validname = mapname(namex)
+			if validname then
+				return validname
+			else
+				--nothing valid found
+				return nil
+			end
+		end
+	end		
+
 	local node = minetest.registered_items[name]
 
 	if not node then
@@ -317,7 +337,16 @@ towntest_chest.formspec = function(pos,page)
 	local pages = towntest_chest.get_files()
 	local x,y = 0,0
 	local p
-	for i = #pages,1,-1 do
+	local firstpage = 1
+	if string.sub(page,0,5) == "page_" then
+		firstpage = tonumber(string.sub(page,6))
+	end
+	local lastpage = #pages
+	if lastpage >= firstpage + 30 then
+		lastpage = firstpage + 30 -1
+	end
+
+	for i = firstpage,lastpage,1 do
 		p = pages[i]
 		if x == 12 then
 			y = y+1
@@ -331,6 +360,19 @@ towntest_chest.formspec = function(pos,page)
 			.."label[4,4.5; no files found in buildings folder:]"
 			.."label[4,5.0; "..minetest.get_modpath("towntest_chest").."/buildings".."]"
 	end
+	local nav = {}
+	if firstpage > 1 then
+		if firstpage - 30 < 1 then
+			nav.back = 1
+		else
+			nav.back = firstpage - 30
+		end
+		formspec = formspec .."button[1,10;2,0.5;nav;page_"..nav.back.."]"
+	end
+	if #pages >= firstpage + 30 then
+		nav.next = firstpage + 30
+		formspec = formspec .."button[4,10;2,0.5;nav;page_"..nav.next.."]"
+	end
 	return formspec
 end
 
@@ -341,6 +383,8 @@ towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 		meta:set_string("building_plan", towntest_chest.load(fields.building))
 		meta:set_string("formspec", towntest_chest.formspec(pos,"chest"))
 		towntest_chest.set_status(meta,1)
+	elseif fields.nav then
+		meta:set_string("formspec", towntest_chest.formspec(pos, fields.nav))
 	end
 end
 
