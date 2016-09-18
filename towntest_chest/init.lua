@@ -44,20 +44,6 @@ towntest_chest.load = function(filename)
 	end
 	-- load the building starting from the lowest y
 	local building = towntest_chest.get_table(file:read("*a"))
-	local building_ordered = {}
-	for i,v in ipairs(building) do
-		if not building_ordered[v.y] then building_ordered[v.y] = {} end
-		table.insert(building_ordered[v.y],v)
-	end
-	building = {}
-	local a = {}
-	for k in pairs(building_ordered) do table.insert(a, k) end
-	table.sort(a)
-	for i,k in ipairs(a) do
-		for ii,vv in ipairs(building_ordered[k]) do
-			table.insert(building,vv)
-		end
-	end
 	return towntest_chest.get_string(building)
 end
 
@@ -113,7 +99,7 @@ towntest_chest.get_table = function(building_string)
 		for x, y, z, name, param1, param2 in building_string:gmatch("([+-]?%d+)%s+([+-]?%d+)%s+([+-]?%d+)%s+([^%s]+)%s+(%d+)%s+(%d+)[^\r\n]*[\r\n]*") do
 			if tonumber(x)~=0 or tonumber(y)~=0 or tonumber(z)~=0 then
 				local matname = mapname(name)
-				if def.matname then 
+				if matname then
 					table.insert(building, {x=x,y=y,z=z,name=name,param1=param1,param2=param2,matname=matname})
 				end
 			end
@@ -194,93 +180,111 @@ towntest_chest.build = function(chestpos)
 		end
 		towntest_chest.update_needed(meta:get_inventory(),building_plan)
 	end
-	local npc = towntest_chest.npc[k]:get_luaentity()
+	local npc = towntest_chest.npc[k]
+	local npclua = npc:get_luaentity()
 
 	-- no building plan
 	if building_plan=="" then
 		-- move the npc to the chest
-		npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
+		npclua:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
 		towntest_chest.set_status(meta,0)
 		return
 	end
-	
-	-- try to build from builder inventory
+
+
+--- search for next buildable node from builder inventory
+--	local npcpos = towntest_chest.npc[k]:getpos()
+	local npcpos = npc:getpos()
+	if not npcpos then --fallback
+		npcpos = chestpos
+	end
+	local nextnode = {}
 	for i,v in ipairs(building_plan) do
-		local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
-		-- check if the builder has the node
 		if inv:contains_item("builder", v.matname) or -- is payed or
 -- for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
-		   ( v.matname == "free" and i == #building_plan )
-		then
-			-- check if npc is already moving
-			if npc and not npc.target then
-				table.remove(building_plan,i)
-				-- move the npc to the build area
-				npc:moveto({x=pos.x, y=pos.y+1.5, z=pos.z}, 2, 2, 0, function(self,after_param)
-					-- take from the inv
-					after_param.inv:remove_item("builder", after_param.v.matname.." 1")
-					-- add the node to the world
-					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
-			                if v.meta then
-						minetest.env:get_meta(after_param.pos):from_table(after_param.v.meta)
-			                end
+		   ( v.matname == "free" and i >= (#building_plan-1) ) then
 
-					-- update the chest building_plan
-					meta:set_string("building_plan", towntest_chest.get_string(building_plan))
-				end, {pos=pos, v=v, inv=inv, meta=meta})
+			local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
+			local distance = math.abs(pos.x - npcpos.x) + math.abs(pos.y-(npcpos.y-10))*2 + math.abs(pos.z - npcpos.z)
+			if not nextnode.v or (distance < nextnode.distance) then
+				nextnode.v = v
+				nextnode.i = i
+				nextnode.pos = pos
+				nextnode.distance = distance
 			end
-			return
 		end
 	end
+--- next buildable node found
+	if nextnode.v then
+		-- check if npc is already moving
+		if npclua and not npclua.target then
+			table.remove(building_plan,nextnode.i)
+			-- move the npc to the build area
+			npclua:moveto({x=nextnode.pos.x, y=nextnode.pos.y+1.5, z=nextnode.pos.z}, 2, 2, 0, function(self,after_param)
+				-- take from the inv
+				after_param.inv:remove_item("builder", after_param.v.matname.." 1")
+				-- add the node to the world
+				minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
+		                if after_param.v.meta then
+					minetest.env:get_meta(after_param.pos):from_table(after_param.v.meta)
+		                end
 
+			-- update the chest building_plan
+				meta:set_string("building_plan", towntest_chest.get_string(building_plan))
+			end, {pos=nextnode.pos, v=nextnode.v, inv=inv, meta=nextnode.meta})
+		end
+		nextnode.v = nil
+
+	else
 	-- try to get items from chest into builder inventory
-	local items_needed = true
-	for i,v in ipairs(building_plan) do
-		-- check if the chest has the node
-		if inv:contains_item("main", v.matname) then
-			items_needed = false
-			-- check if npc is already moving
-			if npc and not npc.target then
-				-- move the npc to the chest
-				npc:moveto({x=chestpos.x, y=chestpos.y+1.5, z=chestpos.z}, 2, 0, 0, function(self, params)
-					-- check for food
-					local inv = params.inv
-					local building_plan = params.building_plan
-					if not inv:is_empty("main") then
-						for i=1,inv:get_size("main") do
-							-- check if this is a food, if so take it
-							local stack = inv:get_stack("main", i)
-							if not stack:is_empty() then
-								local node = minetest.registered_nodes[stack:get_name()]
-								if node and node.name == "default:apple" then
-									local quality = 1
-									npc.food = npc.food + (stack:get_count() * quality * 4)
-									inv:set_stack("main", i, nil)
-								elseif node and node.groups.food ~= nil then
-									local quality = 4 - node.groups.food
-									npc.food = npc.food + (stack:get_count() * quality * 4)
-									inv:set_stack("main", i, nil)
+		local items_needed = true
+		for i,v in ipairs(building_plan) do
+			-- check if the chest has the node
+			if inv:contains_item("main", v.matname) or ( v.matname == "free" and i >= (#building_plan-1)) then
+				items_needed = false
+				-- check if npc is already moving
+				if npclua and not npclua.target then
+					-- move the npc to the chest
+					npclua:moveto({x=chestpos.x, y=chestpos.y+1.5, z=chestpos.z}, 2, 2, 0, function(self, params)
+						-- check for food
+						local inv = params.inv
+						local building_plan = params.building_plan
+						if not inv:is_empty("main") then
+							for i=1,inv:get_size("main") do
+								-- check if this is a food, if so take it
+								local stack = inv:get_stack("main", i)
+								if not stack:is_empty() then
+									local node = minetest.registered_nodes[stack:get_name()]
+									if node and node.name == "default:apple" then
+										local quality = 1
+										npclua.food = npclua.food + (stack:get_count() * quality * 4)
+										inv:set_stack("main", i, nil)
+									elseif node and node.groups.food ~= nil then
+										local quality = 4 - node.groups.food
+										npclua.food = npc.foodlua + (stack:get_count() * quality * 4)
+										inv:set_stack("main", i, nil)
+									end
 								end
 							end
 						end
-					end
-					-- take from the inv
-					for i,v in ipairs(building_plan) do
-						if inv:contains_item("main",v.matname.." 1") and inv:room_for_item("builder",v.matname.." 1") then
-							inv:add_item("builder",inv:remove_item("main",v.matname.." 1"))
-							inv:remove_item("needed", v.matname.." 1")
+						-- take from the inv
+						for i,v in ipairs(building_plan) do
+							if inv:contains_item("main",v.matname.." 1") and inv:room_for_item("builder",v.matname.." 1") then
+								inv:add_item("builder",inv:remove_item("main",v.matname.." 1"))
+								inv:remove_item("needed", v.matname.." 1")
+							end
 						end
-					end
-				end, {inv=inv,building_plan=building_plan})
+					end, {inv=inv,building_plan=building_plan})
+				end
 			end
 		end
-	end
 
-	-- stop building and tell the player what we need
-	if npc and items_needed then
-		npc:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
-		towntest_chest.set_status(meta,0)
-		towntest_chest.update_needed(meta:get_inventory(),building_plan)
+		-- stop building and tell the player what we need
+		if npclua and items_needed then
+			npclua:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
+			towntest_chest.set_status(meta,0)
+			towntest_chest.update_needed(meta:get_inventory(),building_plan)
+		end
 	end
 	
 end
