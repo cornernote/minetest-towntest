@@ -50,15 +50,14 @@ end
 
 
 local function mapname(name)
--- no name given - something wrong
+	-- no name given - something wrong
 	if not name then
 		return nil
 	end
 
--- item table (can be happen in drops). Search for the first valid one
+	-- item table (can be happen in drops). Search for the first valid one
 	if type(name) == "table" then -- drop table. Search for "any payment"
 		for _, namex in pairs(name) do
-			print("name:", namex, "_", _)
 			local validname = mapname(namex)
 			if validname then
 				return validname
@@ -76,7 +75,7 @@ local function mapname(name)
 		return nil
 	else
 
--- known node. Check for price or if it is free
+		-- known node. Check for price or if it is free
 		if (node.groups.not_in_creative_inventory and not (node.groups.not_in_creative_inventory == 0)) or
 		   (not node.description or node.description == "") then
 			if node.drop then
@@ -95,7 +94,7 @@ end
 -- return - table containing pos and nodes to build
 towntest_chest.get_table = function(building_string)
 	local building = {}
-        local wefile = {}
+	local wefile = {}
 	local idx, def
 	local retpos = string.find(string.sub(building_string,0,10), "return")
 	if retpos then
@@ -212,8 +211,7 @@ towntest_chest.build = function(chestpos)
 	end
 
 
---- search for next buildable node from builder inventory
---	local npcpos = towntest_chest.npc[k]:getpos()
+	-- search for next buildable node from builder inventory
 	local npcpos = npc:getpos()
 	if not npcpos then --fallback
 		npcpos = chestpos
@@ -221,7 +219,7 @@ towntest_chest.build = function(chestpos)
 	local nextnode = {}
 	for i,v in ipairs(building_plan) do
 		if inv:contains_item("builder", v.matname) or -- is payed or
--- for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
+		-- for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
 		   ( v.matname == "free" and i >= (#building_plan-1) ) then
 
 			local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
@@ -234,7 +232,8 @@ towntest_chest.build = function(chestpos)
 			end
 		end
 	end
---- next buildable node found
+
+	-- next buildable node found
 	if nextnode.v then
 		-- check if npc is already moving
 		if npclua and not npclua.target then
@@ -245,9 +244,9 @@ towntest_chest.build = function(chestpos)
 				after_param.inv:remove_item("builder", after_param.v.matname.." 1")
 				-- add the node to the world
 				minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
-		                if after_param.v.meta then
+				if after_param.v.meta then
 					minetest.env:get_meta(after_param.pos):from_table(after_param.v.meta)
-		                end
+				end
 
 			-- update the chest building_plan
 				meta:set_string("building_plan", towntest_chest.get_string(building_plan))
@@ -256,7 +255,7 @@ towntest_chest.build = function(chestpos)
 		nextnode.v = nil
 
 	else
-	-- try to get items from chest into builder inventory
+		-- try to get items from chest into builder inventory
 		local items_needed = true
 		for i,v in ipairs(building_plan) do
 			-- check if the chest has the node
@@ -340,6 +339,7 @@ towntest_chest.formspec = function(pos,page)
 	local firstpage = 1
 	if string.sub(page,0,5) == "page_" then
 		firstpage = tonumber(string.sub(page,6))
+		firstpage = (firstpage - 1) * 30 + 1  -- 1, 31, 61, ...
 	end
 	local lastpage = #pages
 	if lastpage >= firstpage + 30 then
@@ -361,17 +361,18 @@ towntest_chest.formspec = function(pos,page)
 			.."label[4,5.0; "..minetest.get_modpath("towntest_chest").."/buildings".."]"
 	end
 	local nav = {}
+	nav.back = 0 --initialized for nav.next calculation
 	if firstpage > 1 then
 		if firstpage - 30 < 1 then
 			nav.back = 1
 		else
-			nav.back = firstpage - 30
+			nav.back = (firstpage - 1) / 30
 		end
 		formspec = formspec .."button[1,10;2,0.5;nav;page_"..nav.back.."]"
 	end
 	if #pages >= firstpage + 30 then
-		nav.next = firstpage + 30
-		formspec = formspec .."button[4,10;2,0.5;nav;page_"..nav.next.."]"
+		nav.next = nav.back + 2
+		formspec = formspec .."button[9,10;2,0.5;nav;page_"..nav.next.."]"
 	end
 	return formspec
 end
@@ -402,7 +403,7 @@ end
 
 -- register_node - the chest where you put the items
 minetest.register_node("towntest_chest:chest", {
-    description = "Building Chest",
+	description = "Building Chest",
 	tiles = {"default_chest_top.png", "default_chest_top.png", "default_chest_side.png",
 		"default_chest_side.png", "default_chest_side.png", "default_chest_front.png"},
 	paramtype2 = "facedir",
@@ -454,14 +455,13 @@ minetest.register_abm({
 
 
 minetest.register_craft({
-        output = 'towntest_chest:chest',
-        recipe = {
-                {'default:mese_crystal', 'default:chest_locked', 'default:mese_crystal'},
-                {'default:book', 'default:diamond',    'default:book'},
-                {'default:mese_crystal', 'default:chest_locked', 'default:mese_crystal'},
-        }
+	output = 'towntest_chest:chest',
+	recipe = {
+		{'default:mese_crystal', 'default:chest_locked', 'default:mese_crystal'},
+		{'default:book', 'default:diamond', 'default:book'},
+		{'default:mese_crystal', 'default:chest_locked', 'default:mese_crystal'},
+	}
 })
 
 -- log that we started
 minetest.log("action", "[MOD]"..minetest.get_current_modname().." -- loaded from "..modpath)
-
