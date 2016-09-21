@@ -66,9 +66,9 @@ minetest.register_entity("towntest_npc:builder", {
 	range_y = nil,
 	after = nil,
 	after_param = nil,
-	
+
 	food = 0,
-	
+
 	get_staticdata = function(self)
 		return minetest.serialize({
 			chestpos = self.chestpos,
@@ -92,7 +92,7 @@ minetest.register_entity("towntest_npc:builder", {
 			self.food = data.food
 		end
 	end,
-	
+
 	on_punch = function(self)
 		-- remove npc from the list of npcs when they die
 		if self.object:get_hp() <= 0 and self.chestpos then
@@ -112,16 +112,6 @@ minetest.register_entity("towntest_npc:builder", {
 			local t = self.target
 			local diff = {x=t.x-s.x, y=t.y-s.y, z=t.z-s.z}
 
-			if math.abs(diff.x) < self.range and math.abs(diff.y) < self.range_y and math.abs(diff.z) < self.range then
-				self.object:setvelocity({x=0, y=0, z=0})
-				self.target = nil
-				self.speed = nil
-				if self.after then
-					self.after(self, self.after_param) -- after they arrive
-				end
-				return
-			end
-
 			local yaw = math.atan(diff.z / diff.x) + math.pi / 2
 			if diff.x == 0 then
 				if diff.z > 0 then
@@ -133,6 +123,17 @@ minetest.register_entity("towntest_npc:builder", {
 				yaw = yaw - math.pi / 2
 			end
 			self.object:setyaw(yaw) -- turn and look in given direction
+
+			if math.abs(diff.x) < self.range and math.abs(diff.y) < self.range_y and math.abs(diff.z) < self.range then
+				self.object:setvelocity({x=0, y=0, z=0})
+				self.target = "reached" --status the after_param is in process
+				self.speed = nil
+				if self.after then
+					self.after(self, self.after_param) -- after they arrive
+				end
+				self.target = nil --self.after is done
+				return
+			end
 
 			local v = self.speed
 			if self.food > 0 then
@@ -152,7 +153,7 @@ minetest.register_entity("towntest_npc:builder", {
 				self.object:setyaw(self.object:getyaw()+((math.random(0,360)-180)/180*math.pi))
 			end
 		end
-		
+
 	end,
 
 	-- API
