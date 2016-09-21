@@ -10,6 +10,13 @@ CHEST
 
 ]]--
 
+
+--if the value is to big, it can happen the builder stucks and just stay (beter hardware required in RL)
+--if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
+--the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
+
+local c_npc_imagination = 600
+
 local modpath = minetest.get_modpath(minetest.get_current_modname())
 
 -- expose api
@@ -18,7 +25,13 @@ towntest_chest = {}
 -- table of non playing characters
 towntest_chest.npc = {}
 
--- get_files 
+local function dprint(...)
+-- debug print. Comment out the next line if you don't need debug out
+--	print(unpack(arg))
+end
+
+
+-- get_files
 -- returns a table containing buildings
 towntest_chest.get_files = function()
 	local lfs = require("lfs")
@@ -44,8 +57,9 @@ towntest_chest.load = function(filename)
 		return
 	end
 	-- load the building starting from the lowest y
-	local building = towntest_chest.get_table(file:read("*a"))
-	return towntest_chest.get_string(building)
+	local building_plan = towntest_chest.get_table(file:read("*a"))
+	table.sort(building_plan,function(a,b) return a.y<b.y end) -- sort by y to prefer lower nodes in building order
+	return building_plan
 end
 
 
@@ -66,15 +80,14 @@ local function mapname(name)
 				return nil
 			end
 		end
-	end		
+	end
 
 	local node = minetest.registered_items[name]
 
 	if not node then
-		minetest.log("info", "unknown node in building: "..name)
+		dprint("unknown node in building: "..name)
 		return nil
 	else
-
 		-- known node. Check for price or if it is free
 		if (node.groups.not_in_creative_inventory and not (node.groups.not_in_creative_inventory == 0)) or
 		   (not node.description or node.description == "") then
@@ -87,6 +100,52 @@ local function mapname(name)
 			return node.name
 		end
 	end
+end
+
+local function is_equal_meta(a,b)
+	local typa = type(a)
+	local typb = type(b)
+	if typa ~= typb then
+		return false
+	end
+
+	if typa == "table" then
+		if #a ~= #b then
+			return false
+		else
+			for i,v in ipairs(a) do
+				if not is_equal_meta(a[i],b[i]) then
+					return false
+				end
+			end
+			return true
+		end
+	else
+		if a == b then
+			return true
+		end
+	end
+end
+
+
+local function skip_already_placed(building_plan, chestpos)
+	-- skip already right placed nodes. remove themfrom build plan. Usefull to resume the build
+	for idx, def in ipairs(building_plan) do
+		local pos = {x=def.x+chestpos.x,y=def.y+chestpos.y,z=def.z+chestpos.z}
+		local node_placed = minetest.get_node(pos)
+		if node_placed.name == def.name then -- right node is at the place. there are no costs to touch them
+			if not def.meta then
+				building_plan[idx] = nil --no metadata handling needed. nothing to do
+			elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
+				building_plan[idx] = nil
+			else
+				building_plan[idx].matname = "free"
+			end
+		elseif mapname(node_placed.name) == mapname(def.name) then
+			building_plan[idx].matname = "free" --same price. Check/set for free
+		end
+	end
+	return building_plan
 end
 
 -- get_table - convert building table to string
@@ -103,13 +162,15 @@ towntest_chest.get_table = function(building_string)
 		if exe then
 			ok, wefile = pcall(exe)
 		end
-		
+
 		for idx,def in pairs(wefile) do
-			if tonumber(def.x)~=0 or tonumber(def.y)~=0 or tonumber(def.z)~=0 then
+			if (def.x and def.y and def.z) and -- more robust. Values should be existing
+			   (tonumber(def.x)~=0 or tonumber(def.y)~=0 or tonumber(def.z)~=0) then
 				if not def.matname then
 					def.matname = mapname(def.name)
 				end
 				if def.matname then -- found
+					-- the node will be built
 					table.insert(building, {x=def.x,y=def.y,z=def.z,name=def.name,param1=def.param1,param2=def.param2,meta=def.meta,matname=def.matname})
 				end
 			end
@@ -124,6 +185,7 @@ towntest_chest.get_table = function(building_string)
 			end
 		end
 	end
+
 	return building
 end
 
@@ -140,7 +202,7 @@ end
 
 -- update_needed - updates the needed inventory in the chest
 -- inv - inventory object of the chest
--- building - table containing pos and nodes to build 
+-- building - table containing pos and nodes to build
 towntest_chest.update_needed = function(inv,building)
 	for i=1,inv:get_size("needed") do
 		inv:set_stack("needed", i, nil)
@@ -150,7 +212,7 @@ towntest_chest.update_needed = function(inv,building)
 		if v.matname ~= "free" then --free materials will be built for free
 			if not materials[v.matname] then
 				materials[v.matname] = 1
-			else 
+			else
 				materials[v.matname] = materials[v.matname]+1
 			end
 		end
@@ -199,6 +261,7 @@ towntest_chest.build = function(chestpos)
 		end
 		towntest_chest.update_needed(meta:get_inventory(),building_plan)
 	end
+
 	local npc = towntest_chest.npc[k]
 	local npclua = npc:get_luaentity()
 
@@ -217,49 +280,104 @@ towntest_chest.build = function(chestpos)
 		npcpos = chestpos
 	end
 	local nextnode = {}
+	local laterprocnode = {}
+	local buildable_counter = 0
+	dprint("building plan size", #building_plan)
 	for i,v in ipairs(building_plan) do
-		if inv:contains_item("builder", v.matname) or -- is payed or
-		-- for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
-		   ( v.matname == "free" and i >= (#building_plan-1) ) then
-
+		-- is payed or for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
+		if inv:contains_item("builder", v.matname) or v.matname == "free" then
 			local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 			local distance = math.abs(pos.x - npcpos.x) + math.abs(pos.y-(npcpos.y-10))*2 + math.abs(pos.z - npcpos.z)
-			if not nextnode.v or (distance < nextnode.distance) then
-				nextnode.v = v
-				nextnode.i = i
-				nextnode.pos = pos
-				nextnode.distance = distance
+
+			if 	v.matname ~= "free" or	(distance < 20 or i > (#building_plan-2)) then
+				--buildable and payale / or build the free items if it is really nearly, or if it is at the end of the building plan
+
+				buildable_counter = buildable_counter + 1
+				if not nextnode.v or (distance < nextnode.distance) then
+					nextnode.v = v
+					nextnode.i = i
+					nextnode.pos = pos
+					nextnode.distance = distance
+				elseif not laterprocnode.v or (distance > laterprocnode.distance) then -- the widest node in plan
+					laterprocnode.v = v
+					laterprocnode.i = i
+					laterprocnode.pos = pos
+					laterprocnode.distance = distance
+				end
 			end
+		else
+			-- not buildable at the time. Move to the end of plan till next grabbing from chest
+			-- for better chance to find buildable in the next run (c_npc_imagination pack)
+			table.remove(building_plan,i)
+			table.insert(building_plan,v)
 		end
+			--respect "c_npc_imagination"
+			if i > c_npc_imagination and nextnode.v then
+				dprint("stuck at:", buildable_counter)
+				if laterprocnode.v then
+					--move the widest node to the end of building plan to get a new slot free it next build tick
+					--maybe an other node can be found nearly
+					if buildable_counter >= c_npc_imagination-1 then
+						table.remove(building_plan,laterprocnode.i)
+						table.insert(building_plan,laterprocnode.v)
+						dprint("move to end of plan:", laterprocnode.v.name, "distance", laterprocnode.distance)
+					end
+					laterprocnode.v = nil
+				end
+				break
+			end
+
 	end
 
 	-- next buildable node found
 	if nextnode.v then
-		-- check if npc is already moving
-		if npclua and not npclua.target then
-			table.remove(building_plan,nextnode.i)
-			-- move the npc to the build area
-			npclua:moveto({x=nextnode.pos.x, y=nextnode.pos.y+1.5, z=nextnode.pos.z}, 2, 2, 0, function(self,after_param)
-				-- take from the inv
-				after_param.inv:remove_item("builder", after_param.v.matname.." 1")
-				-- add the node to the world
-				minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
-				if after_param.v.meta then
-					minetest.env:get_meta(after_param.pos):from_table(after_param.v.meta)
+		dprint("next node:", nextnode.v.name, nextnode.v.matname, "distance", nextnode.distance)
+		-- check if npc is on the way or waiting. We can change the route in this case
+		if npclua and npclua.target ~= "reached" then
+			meta:set_string("building_plan", towntest_chest.get_string(building_plan))
+
+			if not npclua.target or npclua.target.x ~= nextnode.pos.x or npclua.target.y ~= nextnode.pos.y+1.5 or npclua.target.z ~= nextnode.pos.z then
+				if npclua.target then
+					dprint("route changed!! old route was:", npclua.target.x, npclua.target.y, npclua.target.z)
 				end
 
-			-- update the chest building_plan
-				meta:set_string("building_plan", towntest_chest.get_string(building_plan))
-			end, {pos=nextnode.pos, v=nextnode.v, inv=inv, meta=nextnode.meta})
+				-- move the npc to the build area
+				npclua:moveto({x=nextnode.pos.x, y=nextnode.pos.y+1.5, z=nextnode.pos.z}, 2, 2, 0, function(self,after_param)
+					-- take from the inv
+					after_param.inv:remove_item("builder", after_param.v.matname.." 1")
+					-- add the node to the world
+					minetest.env:add_node(after_param.pos, {name=after_param.v.name,param1=after_param.v.param1,param2=after_param.v.param2})
+					if after_param.v.meta then
+						minetest.env:get_meta(after_param.pos):from_table(after_param.v.meta)
+					end
+					dprint("placed:", after_param.v.name, after_param.v.matname, "at", after_param.v.x, after_param.v.y, after_param.v.z)
+					-- update the chest building_plan
+					local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
+					for i,v in ipairs(building_plan) do
+						if v.x == after_param.v.x and v.y == after_param.v.y and v.z == after_param.v.z then
+							table.remove(building_plan,i)
+							break
+						end
+					end
+					meta:set_string("building_plan", towntest_chest.get_string(building_plan))
+				end, {pos=nextnode.pos, v=nextnode.v, inv=inv, meta=nextnode.meta})
+			else
+				if npclua.target then
+					dprint("same route recalculated:", npclua.target.x, npclua.target.y, npclua.target.z)
+				end
+			end
 		end
 		nextnode.v = nil
 
 	else
+		dprint("<<--- get new items and re-sort building plan --->>>")
 		-- try to get items from chest into builder inventory
+		table.sort(building_plan,function(a,b) return a.y<b.y end) -- sort by y to prefer lowest nodes in building order
+		meta:set_string("building_plan", towntest_chest.get_string(building_plan)) --save the used order
 		local items_needed = true
 		for i,v in ipairs(building_plan) do
 			-- check if the chest has the node
-			if inv:contains_item("main", v.matname) or ( v.matname == "free" and i >= (#building_plan-1)) then
+			if inv:contains_item("main", v.matname) then
 				items_needed = false
 				-- check if npc is already moving
 				if npclua and not npclua.target then
@@ -297,7 +415,6 @@ towntest_chest.build = function(chestpos)
 				end
 			end
 		end
-
 		-- stop building and tell the player what we need
 		if npclua and items_needed then
 			npclua:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
@@ -305,7 +422,7 @@ towntest_chest.build = function(chestpos)
 			towntest_chest.update_needed(meta:get_inventory(),building_plan)
 		end
 	end
-	
+
 end
 
 -- formspec - get the chest formspec
@@ -313,7 +430,7 @@ towntest_chest.formspec = function(pos,page)
 	local formspec = ""
 	-- chest page
 	if page=="chest" then
-		formspec = formspec 
+		formspec = formspec
 			.."size[10.5,9]"
 			.."list[current_player;main;0,5;8,4;]"
 
@@ -322,13 +439,13 @@ towntest_chest.formspec = function(pos,page)
 
 			.."label[0,2.5; put items here to build:]"
 			.."list[current_name;main;0,3;8,1;]"
-			
+
 			.."label[8.5,0; builder:]"
 			.."list[current_name;builder;8.5,0.5;2,2;]"
 
 			.."label[8.5,2.5; lumberjack:]"
 			.."list[current_name;lumberjack;8.5,3;2,2;]"
-			
+
 		return formspec
 	end
 	-- main page
@@ -381,9 +498,11 @@ end
 towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	local meta = minetest.env:get_meta(pos)
 	if fields.building then
-		meta:set_string("building_plan", towntest_chest.load(fields.building))
+		local building_plan = skip_already_placed(towntest_chest.load(fields.building),pos)
+		meta:set_string("building_plan", towntest_chest.get_string(building_plan))
 		meta:set_string("formspec", towntest_chest.formspec(pos,"chest"))
 		towntest_chest.set_status(meta,1)
+		towntest_chest.update_needed(meta:get_inventory(),building_plan)
 	elseif fields.nav then
 		meta:set_string("formspec", towntest_chest.formspec(pos, fields.nav))
 	end
