@@ -14,10 +14,8 @@ CHEST
 --if the value is to big, it can happen the builder stucks and just stay (beter hardware required in RL)
 --if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
-
 local c_npc_imagination = 600
 
-local modpath = minetest.get_modpath(minetest.get_current_modname())
 
 -- expose api
 towntest_chest = {}
@@ -25,11 +23,17 @@ towntest_chest = {}
 -- table of non playing characters
 towntest_chest.npc = {}
 
+
+-- debug. Used for debug messages. In production the function should be empty
 local function dprint(...)
 -- debug print. Comment out the next line if you don't need debug out
 --	print(unpack(arg))
 end
 
+local modpath = minetest.get_modpath(minetest.get_current_modname())
+
+-- get worldedit parser load_schematic from worldedit mod
+dofile(modpath.."/".."worldedit-serialization.lua")
 
 -- get_files
 -- returns a table containing buildings
@@ -48,7 +52,7 @@ end
 
 -- load
 -- filename - the building file to load
--- return - string containing the pos and nodes to build
+-- return - WE-Shema, containing the pos and nodes to build
 towntest_chest.load = function(filename)
 	local filepath = modpath.."/buildings/"..filename
 	local file, err = io.open(filepath, "rb")
@@ -57,12 +61,14 @@ towntest_chest.load = function(filename)
 		return
 	end
 	-- load the building starting from the lowest y
-	local building_plan = towntest_chest.get_table(file:read("*a"))
-	table.sort(building_plan,function(a,b) return a.y<b.y end) -- sort by y to prefer lower nodes in building order
+	local building_plan = towntest_chest.we_load_schematic(file:read("*a"))
 	return building_plan
 end
 
 
+-- mapname Take filters and actions on nodes before building. Currently the payment item determination and check for registred node only
+-- name - Node name to check and map
+-- return - item name used as payment
 local function mapname(name)
 	-- no name given - something wrong
 	if not name then
@@ -102,6 +108,10 @@ local function mapname(name)
 	end
 end
 
+
+-- is_equal_meta - compare meta information of 2 nodes
+-- name - Node name to check and map
+-- return - item name used as payment
 local function is_equal_meta(a,b)
 	local typa = type(a)
 	local typb = type(b)
@@ -128,77 +138,56 @@ local function is_equal_meta(a,b)
 end
 
 
+-- skip_already_placed - check if the nodes are already placed
+-- building_plan - filtered/enriched WE-Chema to process
+-- chestpos      - building chest position for alignment
+-- return        - filtered/enriched WE-Chema to process, without already placed nodes
 local function skip_already_placed(building_plan, chestpos)
 	-- skip already right placed nodes. remove themfrom build plan. Usefull to resume the build
+	local building_out = {}
 	for idx, def in ipairs(building_plan) do
 		local pos = {x=def.x+chestpos.x,y=def.y+chestpos.y,z=def.z+chestpos.z}
 		local node_placed = minetest.get_node(pos)
 		if node_placed.name == def.name then -- right node is at the place. there are no costs to touch them
 			if not def.meta then
-				building_plan[idx] = nil --no metadata handling needed. nothing to do
+--				--same item without metadata. nothing to do
 			elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
-				building_plan[idx] = nil
+--				--same metadata. Nothing to do
 			else
-				building_plan[idx].matname = "free"
+				def.matname = "free"       --metadata correction for free
+				table.insert(building_out, def)
 			end
 		elseif mapname(node_placed.name) == mapname(def.name) then
-			building_plan[idx].matname = "free" --same price. Check/set for free
+				def.matname = "free"        --same price. Check/set for free
+				table.insert(building_out, def)
+		else
+			table.insert(building_out, def) --rebuild for payment as usual
 		end
 	end
-	return building_plan
+
+	return building_out
 end
 
--- get_table - convert building table to string
--- building_string - string containing pos and nodes to build
--- return - table containing pos and nodes to build
-towntest_chest.get_table = function(building_string)
-	local building = {}
-	local wefile = {}
-	local idx, def
-	local retpos = string.find(string.sub(building_string,0,10), "return")
-	if retpos then
-		local exe, err, ok
-		exe,err = loadstring(string.sub(building_string,retpos))
-		if exe then
-			ok, wefile = pcall(exe)
-		end
-
-		for idx,def in pairs(wefile) do
-			if (def.x and def.y and def.z) and -- more robust. Values should be existing
-			   (tonumber(def.x)~=0 or tonumber(def.y)~=0 or tonumber(def.z)~=0) then
-				if not def.matname then
-					def.matname = mapname(def.name)
-				end
-				if def.matname then -- found
-					-- the node will be built
-					table.insert(building, {x=def.x,y=def.y,z=def.z,name=def.name,param1=def.param1,param2=def.param2,meta=def.meta,matname=def.matname})
-				end
+-- do_prepare_building preprocessing of WE shema to be usable as building_plan
+-- building_in: WE shema
+-- return - filtered/enriched WE-Chema to process
+towntest_chest.do_prepare_building = function(building_in)
+	local building_out = {}
+	for idx,def in pairs(building_in) do
+		if (def.x and def.y and def.z) and -- more robust. Values should be existing
+		   (tonumber(def.x)~=0 or tonumber(def.y)~=0 or tonumber(def.z)~=0) then
+			if not def.matname then
+				def.matname = mapname(def.name)
 			end
-		end
-	else
-		for x, y, z, name, param1, param2 in building_string:gmatch("([+-]?%d+)%s+([+-]?%d+)%s+([+-]?%d+)%s+([^%s]+)%s+(%d+)%s+(%d+)[^\r\n]*[\r\n]*") do
-			if tonumber(x)~=0 or tonumber(y)~=0 or tonumber(z)~=0 then
-				local matname = mapname(name)
-				if matname then
-					table.insert(building, {x=x,y=y,z=z,name=name,param1=param1,param2=param2,matname=matname})
-				end
+			if def.matname then -- found
+				-- the node will be built
+				table.insert(building_out, {x=def.x,y=def.y,z=def.z,name=def.name,param1=def.param1,param2=def.param2,meta=def.meta,matname=def.matname})
 			end
 		end
 	end
-
-	return building
+	return building_out
 end
 
--- get_string - convert building string to table
--- building - table containing pos and nodes to build
--- return - string containing pos and nodes to build
-towntest_chest.get_string = function(building)
-	local building_string = ""
-	if building_string then
-		building_string = "return "..dump(building)
-	end
-	return building_string
-end
 
 -- update_needed - updates the needed inventory in the chest
 -- inv - inventory object of the chest
@@ -245,8 +234,7 @@ towntest_chest.build = function(chestpos)
 	-- load the building_plan
 	local meta = minetest.env:get_meta(chestpos)
 	if meta:get_int("building_status")~=1 then return end
-	local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
-
+	local building_plan = minetest.deserialize((meta:get_string("building_plan")))
 	-- create the npc if needed
 	local inv = meta:get_inventory()
 	local k = chestpos.x..","..chestpos.y..","..chestpos.z
@@ -259,20 +247,22 @@ towntest_chest.build = function(chestpos)
 				inv:set_stack("builder", i, nil)
 			end
 		end
-		towntest_chest.update_needed(meta:get_inventory(),building_plan)
+		if building_plan then
+			towntest_chest.update_needed(meta:get_inventory(),building_plan)
+		end
 	end
 
 	local npc = towntest_chest.npc[k]
 	local npclua = npc:get_luaentity()
 
 	-- no building plan
-	if building_plan=="" then
+	if not building_plan then
 		-- move the npc to the chest
+		dprint("no building plan")
 		npclua:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2,2)
 		towntest_chest.set_status(meta,0)
 		return
 	end
-
 
 	-- search for next buildable node from builder inventory
 	local npcpos = npc:getpos()
@@ -334,7 +324,7 @@ towntest_chest.build = function(chestpos)
 		dprint("next node:", nextnode.v.name, nextnode.v.matname, "distance", nextnode.distance)
 		-- check if npc is on the way or waiting. We can change the route in this case
 		if npclua and npclua.target ~= "reached" then
-			meta:set_string("building_plan", towntest_chest.get_string(building_plan))
+			meta:set_string("building_plan", minetest.serialize(building_plan))
 
 			if not npclua.target or npclua.target.x ~= nextnode.pos.x or npclua.target.y ~= nextnode.pos.y+1.5 or npclua.target.z ~= nextnode.pos.z then
 				if npclua.target then
@@ -352,14 +342,14 @@ towntest_chest.build = function(chestpos)
 					end
 					dprint("placed:", after_param.v.name, after_param.v.matname, "at", after_param.v.x, after_param.v.y, after_param.v.z)
 					-- update the chest building_plan
-					local building_plan = towntest_chest.get_table(meta:get_string("building_plan"))
+					local building_plan = minetest.deserialize(meta:get_string("building_plan"))
 					for i,v in ipairs(building_plan) do
 						if v.x == after_param.v.x and v.y == after_param.v.y and v.z == after_param.v.z then
 							table.remove(building_plan,i)
 							break
 						end
 					end
-					meta:set_string("building_plan", towntest_chest.get_string(building_plan))
+					meta:set_string("building_plan", minetest.serialize(building_plan))
 				end, {pos=nextnode.pos, v=nextnode.v, inv=inv, meta=nextnode.meta})
 			else
 				if npclua.target then
@@ -371,9 +361,16 @@ towntest_chest.build = function(chestpos)
 
 	else
 		dprint("<<--- get new items and re-sort building plan --->>>")
+
+		-- sort by y to prefer lower nodes in building order. At the same level prefer nodes nearly the chest
+		table.sort(building_plan,function(a,b)
+			if a and b then
+				return ((a.y<b.y) or (a.y==b.y and a.x+a.z<b.x+b.z)) end
+			end
+		)
+
 		-- try to get items from chest into builder inventory
-		table.sort(building_plan,function(a,b) return a.y<b.y end) -- sort by y to prefer lowest nodes in building order
-		meta:set_string("building_plan", towntest_chest.get_string(building_plan)) --save the used order
+		meta:set_string("building_plan", minetest.serialize(building_plan)) --save the used order
 		local items_needed = true
 		for i,v in ipairs(building_plan) do
 			-- check if the chest has the node
@@ -498,8 +495,17 @@ end
 towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	local meta = minetest.env:get_meta(pos)
 	if fields.building then
-		local building_plan = skip_already_placed(towntest_chest.load(fields.building),pos)
-		meta:set_string("building_plan", towntest_chest.get_string(building_plan))
+		local we = towntest_chest.load(fields.building)
+		if we then
+			dprint("nodes loaded from file:", #we)
+		end
+		local filtered = towntest_chest.do_prepare_building(we)
+		local building_plan = skip_already_placed(filtered,pos)
+		if building_plan then
+			dprint("nodes in building plan:", #building_plan)
+		end
+
+		meta:set_string("building_plan", minetest.serialize(building_plan))
 		meta:set_string("formspec", towntest_chest.formspec(pos,"chest"))
 		towntest_chest.set_status(meta,1)
 		towntest_chest.update_needed(meta:get_inventory(),building_plan)
@@ -517,7 +523,9 @@ towntest_chest.on_construct = function(pos)
 	meta:get_inventory():set_size("builder", 2*2)
 	meta:get_inventory():set_size("lumberjack", 2*2)
 	meta:set_string("formspec", towntest_chest.formspec(pos, ""))
-	towntest_chest.set_status(meta, 1)
+	meta:set_string("building_plan", "") -- delete previous building plan on this node
+	towntest_chest.set_status(meta, 0) --inactive till a building was selected
+	dprint("chest initialization done")
 end
 
 -- register_node - the chest where you put the items
