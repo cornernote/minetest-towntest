@@ -15,21 +15,24 @@ CHEST
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
 local c_npc_imagination = 500
 
-
 -- expose api
 towntest_chest = {}
+
+-- debug. Used for debug messages. In production the function should be empty
+local dprint = function(...)
+-- debug print. Comment out the next line if you don't need debug out
+--	print(unpack(arg))
+end
+towntest_chest.dprint = dprint
 
 -- table of non playing characters
 towntest_chest.npc = {}
 
-
--- debug. Used for debug messages. In production the function should be empty
-local function dprint(...)
--- debug print. Comment out the next line if you don't need debug out
---	print(unpack(arg))
-end
-
 local modpath = minetest.get_modpath(minetest.get_current_modname())
+
+-- nodes mapping functions
+towntest_chest.mapping = {}
+dofile(modpath.."/".."mapping.lua")
 
 -- get worldedit parser load_schematic from worldedit mod
 dofile(modpath.."/".."worldedit-serialization.lua")
@@ -78,28 +81,34 @@ towntest_chest.mapnodes = function(node)
 	local node_chk = minetest.registered_items[node.name]
 
 	if not node_chk then
-		dprint("unknown node in building: "..node.name)
-		return nil
-	else
-		-- known node. Check for price or if it is free
-		if (node_chk.groups.not_in_creative_inventory and not (node_chk.groups.not_in_creative_inventory == 0)) or
-		   (not node_chk.description or node_chk.description == "") then
-			if node_chk.drop then
-			-- use possible drop as payment
-				if type(node_chk.drop) == "table" then -- drop table
-					node.matname = node_chk.drop[1]  -- use the first one
-				else
-					node.matname = node_chk.drop
-				end
-			else --something not supported, but known
-				node.matname = "free" -- will be build for free. they are something like doors:hidden or second part of coffee lrfurn:coffeetable_back
-			end
-		else -- build for payment the 1:1
-			node.matname = node.name
+		local fallbacknode = towntest_chest.mapping.unknown_nodes(node)
+		if fallbacknode then
+			return towntest_chest.mapnodes(fallbacknode)
 		end
-	end
+	else
+		-- known node Map them?
+		local customizednode = towntest_chest.mapping.customize(node)
+		if not customizednode.matname then --no matname override customizied.
 
-	return node
+			--Check for price or if it is free
+			if (node_chk.groups.not_in_creative_inventory and not (node_chk.groups.not_in_creative_inventory == 0)) or
+			   (not node_chk.description or node_chk.description == "") then
+				if node_chk.drop then
+				-- use possible drop as payment
+					if type(node_chk.drop) == "table" then -- drop table
+						customizednode.matname = node_chk.drop[1]  -- use the first one
+					else
+						customizednode.matname = node_chk.drop
+					end
+				else --something not supported, but known
+					customizednode.matname = "free" -- will be build for free. they are something like doors:hidden or second part of coffee lrfurn:coffeetable_back
+				end
+			else -- build for payment the 1:1
+				customizednode.matname = customizednode.name
+			end
+		end
+		return customizednode
+	end
 end
 
 
@@ -454,7 +463,8 @@ towntest_chest.build = function(chestpos)
 							end
 
 							-- create next chunk to be processed. only buildable items
-							if inv:contains_item("builder",v.matname.." 1") then
+							if inv:contains_item("builder",v.matname.." 1") or -- is in builder inventory
+							    (v.matname == "free" and next_plan[1]) then    -- or free, but builder inventory is not empty
 								table.insert(next_plan,v)
 							end
 
