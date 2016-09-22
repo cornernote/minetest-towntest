@@ -197,17 +197,34 @@ towntest_chest.update_needed = function(inv,building)
 		inv:set_stack("needed", i, nil)
 	end
 	local materials = {}
+
+		-- sort by y to prefer lower nodes in building order. At the same level prefer nodes nearly the chest
+		table.sort(building,function(a,b)
+			if a and b then
+				return ((a.y<b.y) or (a.y==b.y and a.x+a.z<b.x+b.z)) end
+			end
+		)
+
 	for i,v in ipairs(building) do
 		if v.matname ~= "free" then --free materials will be built for free
 			if not materials[v.matname] then
-				materials[v.matname] = 1
+				materials[v.matname] = {name= v.name, count = 1, order = i}
 			else
-				materials[v.matname] = materials[v.matname]+1
+				materials[v.matname].count = materials[v.matname].count+1
 			end
 		end
 	end
-	for k,v in pairs(materials) do
-		inv:add_item("needed",k.." "..v)
+
+-- order the needed by building plan order
+	local keys = {}
+	for key in pairs(materials) do
+		table.insert(keys, key)
+	end
+
+	table.sort(keys, function(a, b) return materials[a].order < materials[b].order end)
+
+	for _, key in ipairs(keys) do
+		inv:add_item("needed",materials[key].name.." "..materials[key].count)
 	end
 end
 
@@ -368,6 +385,8 @@ towntest_chest.build = function(chestpos)
 				return ((a.y<b.y) or (a.y==b.y and a.x+a.z<b.x+b.z)) end
 			end
 		)
+		-- update the needed and sort
+		towntest_chest.update_needed(meta:get_inventory(),building_plan)
 
 		-- try to get items from chest into builder inventory
 		meta:set_string("building_plan", minetest.serialize(building_plan)) --save the used order
