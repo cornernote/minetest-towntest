@@ -10,7 +10,6 @@ CHEST
 
 ]]--
 
-
 --if the value is to big, it can happen the builder stucks and just stay (beter hardware required in RL)
 --if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
@@ -71,7 +70,7 @@ end
 -- return - item name used as payment
 local function mapname(name)
 	-- no name given - something wrong
-	if not name then
+	if not name or name == "" then
 		return nil
 	end
 
@@ -148,7 +147,7 @@ local function skip_already_placed(building_plan, chestpos)
 	for idx, def in ipairs(building_plan) do
 		local pos = {x=def.x+chestpos.x,y=def.y+chestpos.y,z=def.z+chestpos.z}
 		local node_placed = minetest.get_node(pos)
-		if node_placed.name == def.name then -- right node is at the place. there are no costs to touch them
+		if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
 			if not def.meta then
 --				--same item without metadata. nothing to do
 			elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
@@ -156,10 +155,12 @@ local function skip_already_placed(building_plan, chestpos)
 			else
 				def.matname = "free"       --metadata correction for free
 				table.insert(building_out, def)
+				dprint("rebuild to correct metadata",def.name)
 			end
 		elseif mapname(node_placed.name) == mapname(def.name) then
 				def.matname = "free"        --same price. Check/set for free
 				table.insert(building_out, def)
+				dprint("rebuild for free because of the same drop",def.name)
 		else
 			table.insert(building_out, def) --rebuild for payment as usual
 		end
@@ -208,7 +209,7 @@ towntest_chest.update_needed = function(inv,building)
 	for i,v in ipairs(building) do
 		if v.matname ~= "free" then --free materials will be built for free
 			if not materials[v.matname] then
-				materials[v.matname] = {name= v.name, count = 1, order = i}
+				materials[v.matname] = {matname = v.matname, count = 1, order = i}
 			else
 				materials[v.matname].count = materials[v.matname].count+1
 			end
@@ -224,7 +225,7 @@ towntest_chest.update_needed = function(inv,building)
 	table.sort(keys, function(a, b) return materials[a].order < materials[b].order end)
 
 	for _, key in ipairs(keys) do
-		inv:add_item("needed",materials[key].name.." "..materials[key].count)
+		inv:add_item("needed",materials[key].matname.." "..materials[key].count)
 	end
 end
 
