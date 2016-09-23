@@ -171,6 +171,7 @@
 3 1 10 default:sign_wall 187 3
 3 1 12 default:cobble 0 0
 3 2 0 default:cobble 0 0
+3 2 1 default:lava_source 0 0
 3 2 2 default:cobble 0 0
 3 2 12 default:cobble 0 0
 3 3 0 default:cobble 0 0
@@ -218,6 +219,7 @@
 4 1 1 default:cobble 0 0
 4 1 2 default:sandstone 0 0
 4 2 0 default:cobble 0 0
+4 2 1 default:lava_flowing 0 7
 4 2 2 default:sandstone 0 0
 4 3 0 default:cobble 0 0
 4 3 1 default:cobble 0 0
@@ -365,6 +367,7 @@
 7 1 10 default:sign_wall 187 2
 7 1 12 default:cobble 0 0
 7 2 0 default:cobble 0 0
+7 2 1 default:lava_source 0 0
 7 2 2 default:cobble 0 0
 7 2 12 default:cobble 0 0
 7 3 0 default:cobble 0 0
