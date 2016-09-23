@@ -9,8 +9,18 @@ u["beds:bed_bottom_blue"] = { name = "beds:bed_bottom" }
 u["homedecor:table_lamp_max"] = { name = "homedecor:table_lamp_white_max" }
 u["homedecor:refrigerator"]   = { name = "homedecor:refrigerator_steel" }
 
-
 u["ethereal:green_dirt"] = { name = "default:dirt_with_grass" }
+
+-- door compatibility
+u["doors:door_wood_b_c"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
+u["doors:door_wood_b_o"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "1"}}}} --open
+u["doors:door_wood_b_1"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
+u["doors:door_wood_a_c"] = {name = "doors:door_wood_a", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
+u["doors:door_wood_b_o"] = {name = "doors:door_wood_a", {["meta"] = {["fields"] = {["state"] = "1"}}}} --open
+u["doors:door_wood_a_c"] = {name = "doors:hidden" }
+u["doors:door_wood_a_o"] = {name = "doors:hidden" }
+u["doors:door_wood_t_1"] = {name = "doors:hidden" }
+
 towntest_chest.mapping.unknown_nodes_data = u
 
 
@@ -29,6 +39,11 @@ c["default:lava_source"]        = { matname = "bucket:bucket_lava" }
 c["default:river_water_source"] = { matname = "bucket:bucket_river_water" }
 c["default:water_source"]       = { matname = "bucket:bucket_water" }
 
+-- pay different dirt types by the sane dirt
+c["default:dirt_with_dry_grass"] = { matname = "default:dirt" }
+c["default:dirt_with_grass"]     = { matname = "default:dirt" }
+c["default:dirt_with_snow"]      = { matname = "default:dirt" }
+
 towntest_chest.mapping.customize_data = c
 
 
@@ -44,9 +59,21 @@ towntest_chest.mapping.unknown_nodes = function(node)
 		print("unknown node in building", node.name)
 		return nil
 	end
+
 	towntest_chest.dprint("mapped", node.name, "to", map.name)
 	local mappednode = node
 	mappednode.name = map.name
+
+	if map.meta then
+		towntest_chest.dprint("metadata mapping", dump(map.meta))
+		if not mappednode.meta then
+			mappednode.meta = {}
+		end
+		for k, v in pairs(map.meta) do
+			mappednode.meta[k] = v
+			towntest_chest.dprint("map", k, dump(v))
+		end
+	end
 	return mappednode
 end
 
@@ -65,6 +92,15 @@ towntest_chest.mapping.customize = function(node)
 	end
 	if map.matname then
 		mappednode.matname = map.matname
+	end
+
+	if map.meta then
+		if not mappednode.meta then
+			mappednode.meta = {}
+		end
+		for k, v in pairs(map.meta) do
+			mappednode.meta[k] = v
+		end
 	end
 	return mappednode
 end

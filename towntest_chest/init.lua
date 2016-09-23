@@ -427,6 +427,13 @@ towntest_chest.build = function(chestpos)
 		local full_plan = minetest.deserialize(meta:get_string("full_plan"))
 		towntest_chest.update_needed(meta:get_inventory(),full_plan)
 
+		if not full_plan then	 -- no plan. Finished work?
+			npclua:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
+			towntest_chest.set_status(meta,0)
+			towntest_chest.update_needed(meta:get_inventory(),minetest.deserialize(meta:get_string("full_plan")))
+			return
+		end
+
 		local items_needed = true
 		for i,v in ipairs(full_plan) do
 			-- check if the chest has the node
