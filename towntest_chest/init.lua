@@ -91,9 +91,13 @@ towntest_chest.mapnodes = function(node)
 		if not customizednode.matname then --no matname override customizied.
 
 			--Check for price or if it is free
-			if (node_chk.groups.not_in_creative_inventory and not (node_chk.groups.not_in_creative_inventory == 0)) or
-			   (not node_chk.description or node_chk.description == "") then
-				if node_chk.drop then
+			local recipe = minetest.get_craft_recipe(node_chk.name)
+			if (node_chk.groups.not_in_creative_inventory and --not in creative
+			    not (node_chk.groups.not_in_creative_inventory == 0) and
+			   (not recipe or not recipe.items))              --and not craftable
+			 or
+			   (not node_chk.description or node_chk.description == "") then -- no description
+				if node_chk.drop and node_chk.drop ~= "" then
 				-- use possible drop as payment
 					if type(node_chk.drop) == "table" then -- drop table
 						customizednode.matname = node_chk.drop[1]  -- use the first one
@@ -164,7 +168,7 @@ local function skip_already_placed(building_plan, chestpos)
 		elseif towntest_chest.mapnodes(node_placed).matname == towntest_chest.mapnodes(def).matname then
 				def.matname = "free"        --same price. Check/set for free
 				table.insert(building_out, def)
-				dprint("rebuild for free because of the same drop",def.name)
+				dprint("rebuild for free because of the same matname",def.name)
 		else
 			table.insert(building_out, def) --rebuild for payment as usual
 		end
