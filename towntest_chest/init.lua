@@ -468,7 +468,7 @@ towntest_chest.build = function(chestpos)
 
 							-- create next chunk to be processed. only buildable items
 							if inv:contains_item("builder",v.matname.." 1") or -- is in builder inventory
-							    (v.matname == "free" and next_plan[1]) then    -- or free, but builder inventory is not empty
+							    (v.matname == "free") then
 								table.insert(next_plan,v)
 							end
 
@@ -476,6 +476,12 @@ towntest_chest.build = function(chestpos)
 								break
 							end
 						end
+
+						-- delete next plan if free items only but something other todo
+						if inv:is_empty("builder") and #next_plan < #full_plan then
+							next_plan = {}
+						end
+
 						meta:set_string("building_plan", minetest.serialize(next_plan)) --save the used order
 						dprint("next building plan chunk", #next_plan)
 					end, {inv=inv,full_plan=full_plan})
