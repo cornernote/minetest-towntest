@@ -11,12 +11,26 @@ u["homedecor:refrigerator"]   = { name = "homedecor:refrigerator_steel" }
 
 u["ethereal:green_dirt"] = { name = "default:dirt_with_grass" }
 
--- door compatibility
-u["doors:door_wood_b_c"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
-u["doors:door_wood_b_o"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "1"}}}} --open
-u["doors:door_wood_b_1"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
-u["doors:door_wood_a_c"] = {name = "doors:door_wood_a", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
-u["doors:door_wood_b_o"] = {name = "doors:door_wood_a", {["meta"] = {["fields"] = {["state"] = "1"}}}} --open
+-- door compatibility. Seems the old doors was facedir and now the wallmounted values should be used
+local param2_wallmounted_to_facedir = function(node)
+	if node.param2 == 0 then     -- +y?
+		return 0
+	elseif node.param2 == 1 then -- -y?
+		return 1
+	elseif node.param2 == 2 then --unsure
+		return 3
+	elseif node.param2 == 3 then --unsure
+		return 1
+	elseif node.param2 == 4 then --unsure
+		return 2
+	elseif node.param2 == 5 then --unsure
+		return 0
+	end
+end
+
+u["doors:door_wood_b_c"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}},param2 = param2_wallmounted_to_facedir} --closed
+u["doors:door_wood_b_o"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "1"}}},param2 = param2_wallmounted_to_facedir} --open
+u["doors:door_wood_b_1"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}},param2 = param2_wallmounted_to_facedir} --closed
 u["doors:door_wood_a_c"] = {name = "doors:hidden" }
 u["doors:door_wood_a_o"] = {name = "doors:hidden" }
 u["doors:door_wood_t_1"] = {name = "doors:hidden" }
@@ -62,7 +76,7 @@ towntest_chest.mapping.unknown_nodes = function(node)
 
 	towntest_chest.dprint("mapped", node.name, "to", map.name)
 	local mappednode = node
-	mappednode.name = map.name
+	mappednode.name = map.name -- must be there!
 
 	if map.meta then
 		towntest_chest.dprint("metadata mapping", dump(map.meta))
@@ -74,6 +88,28 @@ towntest_chest.mapping.unknown_nodes = function(node)
 			towntest_chest.dprint("map", k, dump(v))
 		end
 	end
+
+--	towntest_chest.dprint(dump(map))
+	if map.param1 then
+		if type(map.param1) == "function" then
+			towntest_chest.dprint("map param1 by function")
+			mappednode.param1 = map.param1(node)
+		else
+			mappednode.param1 = map.param1
+			towntest_chest.dprint("map param1 by value")
+		end
+	end
+
+	if map.param2 then
+		if type(map.param2) == "function" then
+			towntest_chest.dprint("map param2 by function")
+			mappednode.param2 = map.param2(node)
+		else
+			towntest_chest.dprint("map param2 by value")
+			mappednode.param2 = map.param2
+		end
+	end
+
 	return mappednode
 end
 
