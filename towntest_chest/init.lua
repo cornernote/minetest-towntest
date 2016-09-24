@@ -156,14 +156,21 @@ local function skip_already_placed(building_plan, chestpos)
 		local pos = {x=def.x+chestpos.x,y=def.y+chestpos.y,z=def.z+chestpos.z}
 		local node_placed = minetest.get_node(pos)
 		if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
-			if not def.meta then
---				--same item without metadata. nothing to do
-			elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
---				--same metadata. Nothing to do
-			else
-				def.matname = "free"       --metadata correction for free
+			if -- [(def.param1 ~= node_placed.param1 and not (def.param1 == nil and node_placed.param1  == 0)) or ]-- -- param1 (light) is can be changed
+			   (def.param2 ~= node_placed.param2 and not (def.param2 == nil and node_placed.param2  == 0)) then
+				def.matname = "free" -- adjust params for free
 				table.insert(building_out, def)
-				dprint("rebuild to correct metadata",def.name)
+				dprint("adjust params for free",def.name, def.param1, node_placed.param1, def.param2, node_placed.param2 )
+			else
+				if not def.meta then
+--					--same item without metadata. nothing to do
+				elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
+--					--same metadata. Nothing to do
+				else
+					def.matname = "free"       --metadata correction for free
+					table.insert(building_out, def)
+					dprint("rebuild to correct metadata",def.name)
+				end
 			end
 		elseif towntest_chest.mapnodes(node_placed).matname == towntest_chest.mapnodes(def).matname then
 				def.matname = "free"        --same price. Check/set for free
