@@ -37,8 +37,11 @@ dofile(modpath.."/".."mapping.lua")
 -- get worldedit parser load_schematic from worldedit mod
 dofile(modpath.."/".."worldedit-serialization.lua")
 
+-----------------------------------------------
 -- get_files
+-- no input parameters
 -- returns a table containing buildings
+-----------------------------------------------
 towntest_chest.get_files = function()
 	local lfs = require("lfs")
 	local i, t = 0, {}
@@ -52,14 +55,16 @@ towntest_chest.get_files = function()
 	return t
 end
 
+-----------------------------------------------
 -- load
 -- filename - the building file to load
 -- return - WE-Shema, containing the pos and nodes to build
+-----------------------------------------------
 towntest_chest.load = function(filename)
 	local filepath = modpath.."/buildings/"..filename
 	local file, err = io.open(filepath, "rb")
 	if err ~= nil then
-		minetest.chat_send_player(placer:get_player_name(), "[towntest_chest] error: could not open file \"" .. filepath .. "\"")
+		dprint("[towntest_chest] error: could not open file \"" .. filepath .. "\"")
 		return
 	end
 	-- load the building starting from the lowest y
@@ -67,10 +72,11 @@ towntest_chest.load = function(filename)
 	return building_plan
 end
 
-
+-----------------------------------------------
 -- towntest_chest.mapnodes Take filters and actions on nodes before building. Currently the payment item determination and check for registred node only
 -- node - Node (from file) to check if buildable and payable
 -- return - node with enhanced informations
+-----------------------------------------------
 towntest_chest.mapnodes = function(node)
 
 	-- no name given - something wrong
@@ -115,10 +121,11 @@ towntest_chest.mapnodes = function(node)
 	end
 end
 
-
+-----------------------------------------------
 -- is_equal_meta - compare meta information of 2 nodes
 -- name - Node name to check and map
 -- return - item name used as payment
+-----------------------------------------------
 local function is_equal_meta(a,b)
 	local typa = type(a)
 	local typb = type(b)
@@ -145,10 +152,12 @@ local function is_equal_meta(a,b)
 end
 
 
+-----------------------------------------------
 -- skip_already_placed - check if the nodes are already placed
 -- building_plan - filtered/enriched WE-Chema to process
 -- chestpos      - building chest position for alignment
 -- return        - filtered/enriched WE-Chema to process, without already placed nodes
+-----------------------------------------------
 local function skip_already_placed(building_plan, chestpos)
 	-- skip already right placed nodes. remove themfrom build plan. Usefull to resume the build
 	local building_out = {}
@@ -184,9 +193,11 @@ local function skip_already_placed(building_plan, chestpos)
 	return building_out
 end
 
+-----------------------------------------------
 -- do_prepare_building preprocessing of WE shema to be usable as building_plan
 -- building_in: WE shema
 -- return - filtered/enriched WE-Chema to process
+-----------------------------------------------
 towntest_chest.do_prepare_building = function(building_in)
 	local building_out = {}
 	for idx,def in pairs(building_in) do
@@ -203,9 +214,11 @@ towntest_chest.do_prepare_building = function(building_in)
 end
 
 
+-----------------------------------------------
 -- update_needed - updates the needed inventory in the chest
 -- inv - inventory object of the chest
 -- building - table containing pos and nodes to build
+-----------------------------------------------
 towntest_chest.update_needed = function(inv,building)
 	dprint("update_needed - started")
 	for i=1,inv:get_size("needed") do
@@ -253,9 +266,11 @@ towntest_chest.update_needed = function(inv,building)
 	dprint("update_needed - finished")
 end
 
+-----------------------------------------------
 -- set_status - activate or deactivate building
 -- meta - meta object of the chest
 -- status - integer (will toggle if status not given)
+-----------------------------------------------
 towntest_chest.set_status = function(meta,status)
 	if status==nil then
 		status=meta:get_int("building_status")
@@ -271,8 +286,11 @@ towntest_chest.set_status = function(meta,status)
 	dprint("status changed", meta:get_int("building_status"))
 end
 
+
+-----------------------------------------------
 -- build - build a node of the structure
 -- chestpos - the position of the chest containing the instructions
+-----------------------------------------------
 towntest_chest.build = function(chestpos)
 
 	-- load the building_plan
@@ -517,7 +535,10 @@ towntest_chest.build = function(chestpos)
 	end
 end
 
+
+-----------------------------------------------
 -- formspec - get the chest formspec
+-----------------------------------------------
 towntest_chest.formspec = function(pos,page)
 	local formspec = ""
 	-- chest page
@@ -586,7 +607,9 @@ towntest_chest.formspec = function(pos,page)
 	return formspec
 end
 
+-----------------------------------------------
 -- on_receive_fields - called when a chest button is submitted
+-----------------------------------------------
 towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	local meta = minetest.env:get_meta(pos)
 	if fields.building then
@@ -612,7 +635,9 @@ towntest_chest.on_receive_fields = function(pos, formname, fields, sender)
 	end
 end
 
+-----------------------------------------------
 -- on_construct
+-----------------------------------------------
 towntest_chest.on_construct = function(pos)
 	-- setup chest meta and inventory
 	local meta = minetest.env:get_meta(pos)
@@ -627,7 +652,9 @@ towntest_chest.on_construct = function(pos)
 	dprint("chest initialization done")
 end
 
+-----------------------------------------------
 -- register_node - the chest where you put the items
+-----------------------------------------------
 minetest.register_node("towntest_chest:chest", {
 	description = "Building Chest",
 	tiles = {"default_chest_top.png", "default_chest_top.png", "default_chest_side.png",
@@ -671,7 +698,9 @@ minetest.register_node("towntest_chest:chest", {
 	end,
 })
 
+-----------------------------------------------
 -- register_abm - builds the building
+-----------------------------------------------
 minetest.register_abm({
 	nodenames = {"towntest_chest:chest"},
 	interval = 0.5,
@@ -679,7 +708,9 @@ minetest.register_abm({
 	action = towntest_chest.build,
 })
 
-
+-----------------------------------------------
+-- register craft recipe for the chest
+-----------------------------------------------
 minetest.register_craft({
 	output = 'towntest_chest:chest',
 	recipe = {
