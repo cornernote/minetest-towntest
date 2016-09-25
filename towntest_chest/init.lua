@@ -10,6 +10,11 @@ CHEST
 
 ]]--
 
+-- Use LuaFileSystem to list buildings directory if c_use_lfs is set to true
+-- If it is set to false os.execute is used
+local c_use_lfs = false
+
+
 --if the value is to big, it can happen the builder stucks and just stay (beter hardware required in RL)
 --if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
@@ -43,14 +48,28 @@ dofile(modpath.."/".."worldedit-serialization.lua")
 -- returns a table containing buildings
 -----------------------------------------------
 towntest_chest.get_files = function()
-	local lfs = require("lfs")
+	local files = {}
+
+	if c_use_lfs then -- using LuaFileSystem (needs to be installed)
+		dprint("use lfs to get files")
+		local lfs = require("lfs")
+		files = lfs.dir(modpath .. "/buildings")
+	elseif os.getenv('HOME')~=nil then
+		dprint("use GNU tools to get files")
+		files = io.popen('ls -a "'..modpath..'/buildings/"'):lines() -- linux/mac native "ls -a"
+	else
+		dprint("use DOS to get files")
+		files = io.popen('dir "'..modpath..'\\buildings\\*.*" /b'):lines() --windows native "dir /b"
+	end
+
 	local i, t = 0, {}
-	for filename in lfs.dir(modpath .. "/buildings") do
+	for filename in files do
 		if filename ~= "." and filename ~= ".." then
 			i = i + 1
 			t[i] = filename
 		end
 	end
+
 	table.sort(t,function(a,b) return a<b end)
 	return t
 end
