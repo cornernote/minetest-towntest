@@ -18,7 +18,7 @@ local c_use_lfs = false
 --if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
 local c_npc_imagination = 400
-local c_npc_max_build_chunk = 1000
+local c_npc_max_build_chunk = 2000
 
 -- expose api
 towntest_chest = {}
@@ -333,7 +333,10 @@ towntest_chest.build = function(chestpos)
 
 	-- load the building_plan
 	local meta = minetest.env:get_meta(chestpos)
-	if meta:get_int("building_status")~=1 then return end
+	if meta:get_int("building_status")~=1 then
+		minetest.forceload_free_block(chestpos)
+		return
+	end
 
 	dprint("build step started")
 	local building_plan = minetest.deserialize((meta:get_string("building_plan")))
@@ -362,8 +365,13 @@ towntest_chest.build = function(chestpos)
 
 
 	local npcpos = npc:getpos()
-	if not npcpos then --fallback
-		npcpos = chestpos
+	if not npcpos then --npc not reachable/unloaded
+		dprint("npc away, disable forceload on the chest and skip processing")
+		minetest.forceload_free_block(chestpos)
+		return
+	else
+		-- something todo. keep the chest active
+		minetest.forceload_block(chestpos) -- force the chest node is loade
 	end
 
 	dprint("NPC at", npcpos.x, npcpos.y, npcpos.z)
@@ -487,7 +495,8 @@ towntest_chest.build = function(chestpos)
 		-- update the needed and sort
 		local full_plan = minetest.deserialize(meta:get_string("full_plan"))
 		if not full_plan then
-			dprint("no full plan")
+			dprint("no plan")
+			minetest.forceload_free_block(chestpos)
 			return
 		end
 		
