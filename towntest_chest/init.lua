@@ -25,7 +25,7 @@ towntest_chest = {}
 -- debug. Used for debug messages. In production the function should be empty
 local dprint = function(...)
 -- debug print. Comment out the next line if you don't need debug out
-	print(unpack(arg))
+--	print(unpack(arg))
 end
 towntest_chest.dprint = dprint
 
