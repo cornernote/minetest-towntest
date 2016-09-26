@@ -46,17 +46,23 @@ local c = {}
 -- a crazy sample is: instead of cobble place goldblock, use wood as payment
 -- c["default:cobble"] = { name = "default:goldblock", matname = "default:wood" }
 
-c["beds:bed_top"] = { matname = "free" }  -- the bottom of the bed is payed, so buld the top for free
+c["beds:bed_top"] = { matname = towntest_chest.c_free_item }  -- the bottom of the bed is payed, so buld the top for free
 
 -- it is hard to get a source in survival, so we use buckets. Note, the bucket is lost after usage by NPC
 c["default:lava_source"]        = { matname = "bucket:bucket_lava" }
 c["default:river_water_source"] = { matname = "bucket:bucket_river_water" }
 c["default:water_source"]       = { matname = "bucket:bucket_water" }
 
+-- does not sense to set flowing water because it flow away without the source (and will be generated trough source)
+c["default:water_flowing"]       = { name = "" }
+c["default:lava_flowing"]        = { name = "" }
+c["default:river_water_flowing"] = { name = "" }
+
 -- pay different dirt types by the sane dirt
 c["default:dirt_with_dry_grass"] = { matname = "default:dirt" }
 c["default:dirt_with_grass"]     = { matname = "default:dirt" }
 c["default:dirt_with_snow"]      = { matname = "default:dirt" }
+
 
 towntest_chest.mapping.customize_data = c
 
