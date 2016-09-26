@@ -14,11 +14,10 @@ CHEST
 -- If it is set to false os.execute is used
 local c_use_lfs = false
 
-
 --if the value is to big, it can happen the builder stucks and just stay (beter hardware required in RL)
 --if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
-local c_npc_imagination = 500
+local c_npc_imagination = 400
 
 -- expose api
 towntest_chest = {}
@@ -26,9 +25,12 @@ towntest_chest = {}
 -- debug. Used for debug messages. In production the function should be empty
 local dprint = function(...)
 -- debug print. Comment out the next line if you don't need debug out
---	print(unpack(arg))
+	print(unpack(arg))
 end
 towntest_chest.dprint = dprint
+
+-- We need a free item that always available to get visible working on them
+towntest_chest.c_free_item = "default:cloud"
 
 -- table of non playing characters
 towntest_chest.npc = {}
@@ -113,6 +115,11 @@ towntest_chest.mapnodes = function(node)
 	else
 		-- known node Map them?
 		local customizednode = towntest_chest.mapping.customize(node)
+
+		if customizednode.name == "" then --disabled by mapping
+			return nil
+		end
+
 		if not customizednode.matname then --no matname override customizied.
 
 			--Check for price or if it is free
@@ -130,7 +137,7 @@ towntest_chest.mapnodes = function(node)
 						customizednode.matname = node_chk.drop
 					end
 				else --something not supported, but known
-					customizednode.matname = "free" -- will be build for free. they are something like doors:hidden or second part of coffee lrfurn:coffeetable_back
+					customizednode.matname = towntest_chest.c_free_item -- will be build for free. they are something like doors:hidden or second part of coffee lrfurn:coffeetable_back
 				end
 			else -- build for payment the 1:1
 				customizednode.matname = customizednode.name
@@ -186,7 +193,7 @@ local function skip_already_placed(building_plan, chestpos)
 		if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
 			if -- [(def.param1 ~= node_placed.param1 and not (def.param1 == nil and node_placed.param1  == 0)) or ]-- -- param1 (light) is can be changed
 			   (def.param2 ~= node_placed.param2 and not (def.param2 == nil and node_placed.param2  == 0)) then
-				def.matname = "free" -- adjust params for free
+				def.matname = towntest_chest.c_free_item -- adjust params for free
 				table.insert(building_out, def)
 				dprint("adjust params for free",def.name, def.param1, node_placed.param1, def.param2, node_placed.param2 )
 			else
@@ -195,20 +202,28 @@ local function skip_already_placed(building_plan, chestpos)
 				elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
 --					--same metadata. Nothing to do
 				else
-					def.matname = "free"       --metadata correction for free
+					def.matname = towntest_chest.c_free_item       --metadata correction for free
 					table.insert(building_out, def)
 					dprint("rebuild to correct metadata",def.name)
 				end
 			end
-		elseif towntest_chest.mapnodes(node_placed).matname == towntest_chest.mapnodes(def).matname then
-				def.matname = "free"        --same price. Check/set for free
-				table.insert(building_out, def)
-				dprint("rebuild for free because of the same matname",def.name)
 		else
-			table.insert(building_out, def) --rebuild for payment as usual
+			local mappeddef = towntest_chest.mapnodes(def)
+			if not mappeddef or mappeddef.name == "" then -- excluded by mapping
+				--skip
+			else
+				local mappednode = towntest_chest.mapnodes(node_placed)
+				if mappednode and mappednode.matname == mappeddef.matname then
+					def.matname = towntest_chest.c_free_item        --same price. Check/set for free
+					table.insert(building_out, def)
+					dprint("rebuild for free because of the same matname",def.name)
+				else
+					table.insert(building_out, def) --rebuild for payment as usual
+				end
+			end
+
 		end
 	end
-
 	return building_out
 end
 
@@ -256,21 +271,19 @@ towntest_chest.update_needed = function(inv,building)
 			return ((a.y<b.y) or (a.y==b.y and a.x+a.z<b.x+b.z)) end
 		end
 	)
-	dprint("update_needed - sort")
+	dprint("update_needed - Building count:", #building)
 	for i,v in ipairs(building) do
-		if v.matname ~= "free" then --free materials will be built for free
-			if not materials[v.matname] then
-				materials[v.matname] = {matname = v.matname, count = 1, order = i}
-			else
-				materials[v.matname].count = materials[v.matname].count+1
-			end
+		if not materials[v.matname] then
+			materials[v.matname] = {matname = v.matname, count = 1, order = i}
+		else
+			materials[v.matname].count = materials[v.matname].count+1
 		end
 		if i > (c_npc_imagination * 20) then --don't calculate all needs if it is really big value
 			break
 		end
 	end
 
-	dprint("update_needed - index")
+	dprint("update_needed - Materials:", #materials )
 -- order the needed by building plan order
 	local keys = {}
 	for key in pairs(materials) do
@@ -346,6 +359,8 @@ towntest_chest.build = function(chestpos)
 	if not npcpos then --fallback
 		npcpos = chestpos
 	end
+
+	dprint("NPC at", npcpos.x,npcpos.y,npcpos,z)
 	local nextnode = {}
 
 	-- building plan
@@ -359,25 +374,21 @@ towntest_chest.build = function(chestpos)
 		dprint("start searching for the next node", #building_plan)
 		for i,v in ipairs(building_plan) do
 			-- is payed or for free and the item is at the end of building plan (all next items already built, to avoid all free items are placed at the first)
-			if inv:contains_item("builder", v.matname) or v.matname == "free" then
+			if inv:contains_item("builder", v.matname) then
 				local pos = {x=v.x+chestpos.x,y=v.y+chestpos.y,z=v.z+chestpos.z}
 				local distance = math.abs(pos.x - npcpos.x) + math.abs(pos.y-(npcpos.y-10))*2 + math.abs(pos.z - npcpos.z)
 
-				if 	v.matname ~= "free" or	(distance < 20 or i > (#building_plan-2)) then
-					--buildable and payale / or build the free items if it is really nearly, or if it is at the end of the building plan
-
-					buildable_counter = buildable_counter + 1
-					if not nextnode.v or (distance < nextnode.distance) then
-						nextnode.v = v
-						nextnode.i = i
-						nextnode.pos = pos
-						nextnode.distance = distance
-					elseif not laterprocnode.v or (distance > laterprocnode.distance) then -- the widest node in plan
-						laterprocnode.v = v
-						laterprocnode.i = i
-						laterprocnode.pos = pos
-						laterprocnode.distance = distance
-					end
+				buildable_counter = buildable_counter + 1
+				if not nextnode.v or (distance < nextnode.distance) then
+					nextnode.v = v
+					nextnode.i = i
+					nextnode.pos = pos
+					nextnode.distance = distance
+				elseif not laterprocnode.v or (distance > laterprocnode.distance) then -- the widest node in plan
+					laterprocnode.v = v
+					laterprocnode.i = i
+					laterprocnode.pos = pos
+					laterprocnode.distance = distance
 				end
 			else
 				-- not buildable anymore (material used up). remove from current building chunk
@@ -413,7 +424,7 @@ towntest_chest.build = function(chestpos)
 
 	-- next buildable node found
 	if nextnode.v then
-		dprint("next node:", nextnode.v.name, nextnode.v.matname, "distance", nextnode.distance)
+		dprint("next node:", nextnode.v.name, nextnode.v.matname, "distance", nextnode.distance, "at",  nextnode.pos.x, nextnode.pos.y, nextnode.pos.z)
 		-- check if npc is on the way or waiting. We can change the route in this case
 		if npclua and npclua.target ~= "reached" then
 			meta:set_string("building_plan", minetest.serialize(building_plan))
@@ -470,7 +481,7 @@ towntest_chest.build = function(chestpos)
 		-- update the needed and sort
 		local full_plan = minetest.deserialize(meta:get_string("full_plan"))
 		towntest_chest.update_needed(meta:get_inventory(),full_plan)
-
+		dprint("full plan is", #full_plan)
 		if not full_plan then	 -- no plan. Finished work?
 			npclua:moveto({x=chestpos.x,y=chestpos.y+1.5,z=chestpos.z},2)
 			towntest_chest.set_status(meta,0)
@@ -481,7 +492,7 @@ towntest_chest.build = function(chestpos)
 		local items_needed = true
 		for i,v in ipairs(full_plan) do
 			-- check if the chest has the node
-			if inv:contains_item("main", v.matname) then
+			if inv:contains_item("main", v.matname) or v.matname == towntest_chest.c_free_item then
 				items_needed = false
 				-- check if npc is already moving
 				if npclua and not npclua.target then
@@ -490,6 +501,8 @@ towntest_chest.build = function(chestpos)
 						-- check for food
 						local inv = params.inv
 						local full_plan = params.full_plan
+
+						dprint("full plan is", #full_plan)
 						local next_plan = {}
 						if not inv:is_empty("main") then
 							for i=1,inv:get_size("main") do
@@ -510,27 +523,80 @@ towntest_chest.build = function(chestpos)
 							end
 						end
 
+						--some free_items handling preparation
+						local free_needed = 0
+						local all_needed  = #full_plan
+						--get free needed count
+						if not inv:is_empty("needed") then
+							for i=1,inv:get_size("needed") do
+								local stack = inv:get_stack("needed", i)
+								if not stack:is_empty() and stack:get_name() == towntest_chest.c_free_item then
+									free_needed = free_needed + stack:get_count()
+								end
+							end
+						end
+						local rarity_needed = 0
+						if all_needed == free_needed then --free items only remeans
+							rarity_needed = 1
+						else
+							rarity_needed = free_needed / (all_needed - free_needed)  -- current rarity
+						end
+						dprint("rarity needed =", rarity_needed, "=", free_needed, all_needed)
+
+						local free_selected = 0
+						local all_selected = 0
+						local rarity_selected = 0
+						local free_nodes_pipe = {}
 						for i,v in ipairs(full_plan) do
 							-- take from the inv
 							if inv:contains_item("main",v.matname.." 1") and inv:room_for_item("builder",v.matname.." 1") then
 								inv:add_item("builder",inv:remove_item("main",v.matname.." 1"))
 								inv:remove_item("needed", v.matname.." 1")
+								all_selected = all_selected + 1
+							end
+
+							-- handle free items. There can be added, but relativelly to the needed
+							if v.matname == towntest_chest.c_free_item then -- is free item
+								table.insert(free_nodes_pipe, v)
+								dprint("free items pipeline:", #free_nodes_pipe)
+							end
+
+							for fnpi,fnp in ipairs(free_nodes_pipe) do
+								if inv:room_for_item("builder",towntest_chest.c_free_item.." 1") then -- can be aplied
+									if all_selected == free_selected then -- free only selected
+										rarity_selected = 1
+									else
+										rarity_selected = free_selected / (all_selected - free_selected)  -- current rarity
+									end
+									if rarity_selected <= rarity_needed then    -- current selection have less rarity
+										inv:add_item("builder", towntest_chest.c_free_item.." 1")
+										inv:remove_item("needed", towntest_chest.c_free_item.." 1")
+										free_selected = free_selected + 1
+										all_selected = all_selected + 1
+										table.remove(free_nodes_pipe,fnpi)
+										table.insert(next_plan,fnp)
+										dprint("rarity selected =", rarity_selected, "=", free_selected, all_selected)
+										dprint("free item selected. left:", #free_nodes_pipe)
+										if #free_nodes_pipe == 0 then
+											break  --exit free nodes pipe loop
+										end
+									end
+								else
+									free_nodes_pipe = {}
+									dprint("free items requested: reset, no place")
+									break --exit free nodes pipe loop
+								end
 							end
 
 							-- create next chunk to be processed. only buildable items
-							if inv:contains_item("builder",v.matname.." 1") or -- is in builder inventory
-							    (v.matname == "free") then
+							if v.matname ~= towntest_chest.c_free_item and -- free item already handled
+							   inv:contains_item("builder",v.matname.." 1")	then -- is in builder inventory
 								table.insert(next_plan,v)
 							end
 
-							if i > c_npc_imagination * 20 then --limit the building plan chunk size
+							if i > c_npc_imagination * 10 then --limit the building plan chunk size
 								break
 							end
-						end
-
-						-- delete next plan if free items only but something other todo
-						if inv:is_empty("builder") and #next_plan < #full_plan then
-							next_plan = {}
 						end
 
 						meta:set_string("building_plan", minetest.serialize(next_plan)) --save the used order
@@ -540,7 +606,7 @@ towntest_chest.build = function(chestpos)
 				break --there is a update loop in moveto-function
 				end
 			end
-			if i > c_npc_imagination * 5 then --limit the building plan chunk size
+			if i > c_npc_imagination * 10 then --limit the building plan chunk size
 				break
 			end
 		end
