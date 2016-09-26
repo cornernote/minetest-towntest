@@ -18,6 +18,7 @@ local c_use_lfs = false
 --if to low, it can happen the searching next near node is poor and the builder acts overwhelmed, fail to see some nearly gaps. The order seems to be randomized
 --the right value is depend on building size. If the building (or the not builded rest) can full imaginated (less blocks in building then c_npc_imagination) there is the full search potencial active
 local c_npc_imagination = 400
+local c_npc_max_build_chunk = 1000
 
 -- expose api
 towntest_chest = {}
@@ -189,39 +190,44 @@ local function skip_already_placed(building_plan, chestpos)
 	local building_out = {}
 	for idx, def in ipairs(building_plan) do
 		local pos = {x=def.x+chestpos.x,y=def.y+chestpos.y,z=def.z+chestpos.z}
-		local node_placed = minetest.get_node(pos)
-		if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
-			if -- [(def.param1 ~= node_placed.param1 and not (def.param1 == nil and node_placed.param1  == 0)) or ]-- -- param1 (light) is can be changed
-			   (def.param2 ~= node_placed.param2 and not (def.param2 == nil and node_placed.param2  == 0)) then
-				def.matname = towntest_chest.c_free_item -- adjust params for free
-				table.insert(building_out, def)
-				dprint("adjust params for free",def.name, def.param1, node_placed.param1, def.param2, node_placed.param2 )
-			else
-				if not def.meta then
---					--same item without metadata. nothing to do
-				elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
---					--same metadata. Nothing to do
-				else
-					def.matname = towntest_chest.c_free_item       --metadata correction for free
+		if minetest.forceload_block(pos) then
+			local node_placed = minetest.get_node(pos)
+			if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
+				if -- [(def.param1 ~= node_placed.param1 and not (def.param1 == nil and node_placed.param1  == 0)) or ]-- -- param1 (light) is can be changed
+				(def.param2 ~= node_placed.param2 and not (def.param2 == nil and node_placed.param2  == 0)) then
+					def.matname = towntest_chest.c_free_item -- adjust params for free
 					table.insert(building_out, def)
-					dprint("rebuild to correct metadata",def.name)
+					dprint("adjust params for free",def.name, def.param1, node_placed.param1, def.param2, node_placed.param2 )
+				else
+					if not def.meta then
+--						--same item without metadata. nothing to do
+					elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
+--						--same metadata. Nothing to do
+					else
+						def.matname = towntest_chest.c_free_item       --metadata correction for free
+						table.insert(building_out, def)
+						dprint("rebuild to correct metadata",def.name)
+					end
+				end
+			else
+				local mappeddef = towntest_chest.mapnodes(def)
+				if not mappeddef or mappeddef.name == "" then -- excluded by mapping
+					--skip
+				else
+					local mappednode = towntest_chest.mapnodes(node_placed)
+					if mappednode and mappednode.matname == mappeddef.matname then
+						def.matname = towntest_chest.c_free_item        --same price. Check/set for free
+						table.insert(building_out, def)
+						dprint("rebuild for free because of the same matname",def.name)
+					else
+						table.insert(building_out, def) --rebuild for payment as usual
+					end
 				end
 			end
+			minetest.forceload_free_block(pos)
 		else
-			local mappeddef = towntest_chest.mapnodes(def)
-			if not mappeddef or mappeddef.name == "" then -- excluded by mapping
-				--skip
-			else
-				local mappednode = towntest_chest.mapnodes(node_placed)
-				if mappednode and mappednode.matname == mappeddef.matname then
-					def.matname = towntest_chest.c_free_item        --same price. Check/set for free
-					table.insert(building_out, def)
-					dprint("rebuild for free because of the same matname",def.name)
-				else
-					table.insert(building_out, def) --rebuild for payment as usual
-				end
-			end
-
+			dprint("cannot allocate node. Asume the rebuild is needed",def.name)
+			table.insert(building_out, def) --rebuild for payment as usual
 		end
 	end
 	return building_out
@@ -360,7 +366,7 @@ towntest_chest.build = function(chestpos)
 		npcpos = chestpos
 	end
 
-	dprint("NPC at", npcpos.x,npcpos.y,npcpos,z)
+	dprint("NPC at", npcpos.x, npcpos.y, npcpos.z)
 	local nextnode = {}
 
 	-- building plan
@@ -480,6 +486,11 @@ towntest_chest.build = function(chestpos)
 
 		-- update the needed and sort
 		local full_plan = minetest.deserialize(meta:get_string("full_plan"))
+		if not full_plan then
+			dprint("no full plan")
+			return
+		end
+		
 		towntest_chest.update_needed(meta:get_inventory(),full_plan)
 		dprint("full plan is", #full_plan)
 		if not full_plan then	 -- no plan. Finished work?
@@ -594,7 +605,7 @@ towntest_chest.build = function(chestpos)
 								table.insert(next_plan,v)
 							end
 
-							if i > c_npc_imagination * 10 then --limit the building plan chunk size
+							if i > c_npc_max_build_chunk then --limit the building plan chunk size
 								break
 							end
 						end
@@ -605,9 +616,6 @@ towntest_chest.build = function(chestpos)
 
 				break --there is a update loop in moveto-function
 				end
-			end
-			if i > c_npc_imagination * 10 then --limit the building plan chunk size
-				break
 			end
 		end
 
@@ -734,6 +742,7 @@ towntest_chest.on_construct = function(pos)
 	meta:set_string("building_plan", "") -- delete previous building plan on this node
 	meta:set_string("full_plan", "") -- delete previous building plan on this node
 	towntest_chest.set_status(meta, 0) --inactive till a building was selected
+	minetest.forceload_block(pos) -- force the chest node is loaded
 	dprint("chest initialization done")
 end
 
@@ -756,6 +765,7 @@ minetest.register_node("towntest_chest:chest", {
 			towntest_chest.npc[k]:remove()
 		end
 		towntest_chest.npc[k] = nil
+		minetest.forceload_free_block(pos)
 	end,
 	on_punch = function(pos)
 		towntest_chest.set_status(minetest.env:get_meta(pos))

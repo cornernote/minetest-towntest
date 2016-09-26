@@ -30,10 +30,30 @@ end
 
 u["doors:door_wood_b_c"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}},param2 = param2_wallmounted_to_facedir} --closed
 u["doors:door_wood_b_o"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "1"}}},param2 = param2_wallmounted_to_facedir} --open
-u["doors:door_wood_b_1"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}},param2 = param2_wallmounted_to_facedir} --closed
+u["doors:door_wood_b_1"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
+u["doors:door_wood_b_2"] = {name = "doors:door_wood_b", {["meta"] = {["fields"] = {["state"] = "3"}}}} --closed / reversed ??
 u["doors:door_wood_a_c"] = {name = "doors:hidden" }
 u["doors:door_wood_a_o"] = {name = "doors:hidden" }
 u["doors:door_wood_t_1"] = {name = "doors:hidden" }
+u["doors:door_wood_t_2"] = {name = "doors:hidden" }
+
+u["doors:door_glass_b_c"] = {name = "doors:door_glass_b", {["meta"] = {["fields"] = {["state"] = "0"}}},param2 = param2_wallmounted_to_facedir} --closed
+u["doors:door_glass_b_o"] = {name = "doors:door_glass_b", {["meta"] = {["fields"] = {["state"] = "1"}}},param2 = param2_wallmounted_to_facedir} --open
+u["doors:door_glass_b_1"] = {name = "doors:door_glass_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
+u["doors:door_glass_b_2"] = {name = "doors:door_glass_b", {["meta"] = {["fields"] = {["state"] = "3"}}}} --closed / reversed ??
+u["doors:door_glass_a_c"] = {name = "doors:hidden" }
+u["doors:door_glass_a_o"] = {name = "doors:hidden" }
+u["doors:door_glass_t_1"] = {name = "doors:hidden" }
+u["doors:door_glass_t_2"] = {name = "doors:hidden" }
+
+u["doors:door_steel_b_c"] = {name = "doors:door_steel_b", {["meta"] = {["fields"] = {["state"] = "0"}}},param2 = param2_wallmounted_to_facedir} --closed
+u["doors:door_steel_b_o"] = {name = "doors:door_steel_b", {["meta"] = {["fields"] = {["state"] = "1"}}},param2 = param2_wallmounted_to_facedir} --open
+u["doors:door_steel_b_1"] = {name = "doors:door_steel_b", {["meta"] = {["fields"] = {["state"] = "0"}}}} --closed
+u["doors:door_steel_b_2"] = {name = "doors:door_steel_b", {["meta"] = {["fields"] = {["state"] = "3"}}}} --closed / reversed ??
+u["doors:door_steel_a_c"] = {name = "doors:hidden" }
+u["doors:door_steel_a_o"] = {name = "doors:hidden" }
+u["doors:door_steel_t_1"] = {name = "doors:hidden" }
+u["doors:door_steel_t_2"] = {name = "doors:hidden" }
 
 towntest_chest.mapping.unknown_nodes_data = u
 
