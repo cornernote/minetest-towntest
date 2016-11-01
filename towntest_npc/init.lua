@@ -11,53 +11,44 @@ NPCs
 ]]--
 
 local visual, visual_size, textures
--- if minetest.setting_getbool("3d_models") then
-	function x(val) return ((val -80) / 160) end
-	function z(val) return ((val -80) / 160) end
-	function y(val) return ((val + 80) / 160) end
-	minetest.register_node("towntest_npc:builder_box", {
-		tiles = {
-			"towntest_npc_builder_bottom.png",
-			"towntest_npc_builder_top.png",
-			"towntest_npc_builder_back.png",
-			"towntest_npc_builder_front.png",
-			"towntest_npc_builder_right.png",
-			"towntest_npc_builder_left.png",
-		},
-		drawtype = "nodebox",
-		node_box = {
-			type = "fixed",
-			fixed = {
-				--head
-				{x(95),y(-10), z(65), x(65), y(-40), z(95)},
-				--neck
-				{x(90),y(-40),z(70) , x(70), y(-50),z(90) },
-				--body
-				{x(90),y(-50), z(60), x(70), y(-100), z(100)},
-				--legs
-				{x(90),y(-100), z(60),x(70), y(-160),z(79) },
-				{x(90),y(-100), z(81),x(70), y(-160), z(100)},
-				--shoulders
-				{x(89),y(-50), z(58), x(71),y(-68),z(60)},
-				{x(89),y(-50), z(100),x(71) ,y(-68),z(102)},
-				--left arm
-				{x(139),y(-50),z(45),x(71),y(-63),z(58)},
-				--right arm
-				{x(89),y(-50),z(102),x(71),y(-100),z(115)},
-				{x(115),y(-87),z(102),x(71),y(-100),z(115)},
-			}
-		},
-	})
-	visual = "wielditem"
-	visual_size = nil
-	textures = {"towntest_npc:builder_box"}
--- 2dmodel
---else
---	visual = "upright_sprite"
---	visual_size = {x=1, y=2}
---	textures = {"towntest_npc_builder_sprite_front.png", "towntest_npc_builder_sprite_back.png"}
---end
 
+function x(val) return ((val -80) / 160) end
+function z(val) return ((val -80) / 160) end
+function y(val) return ((val + 80) / 160) end
+
+minetest.register_node("towntest_npc:builder_box", {
+	tiles = {
+		"towntest_npc_builder_top.png",
+		"towntest_npc_builder_bottom.png",
+		"towntest_npc_builder_front.png",
+		"towntest_npc_builder_back.png",
+		"towntest_npc_builder_left.png",
+		"towntest_npc_builder_right.png",
+	},
+	drawtype = "nodebox",
+	node_box = {
+		type = "fixed",
+		fixed = {
+			--head
+			{x(95),y(-10), z(65), x(65), y(-40), z(95)},
+			--neck
+			{x(90),y(-40),z(70) , x(70), y(-50),z(90) },
+			--body
+			{x(90),y(-50), z(60), x(70), y(-100), z(100)},
+			--legs
+			{x(90),y(-100), z(60),x(70), y(-160),z(79) },
+			{x(90),y(-100), z(81),x(70), y(-160), z(100)},
+			--shoulders
+			{x(89),y(-50), z(58), x(71),y(-68),z(60)},
+			{x(89),y(-50), z(100),x(71) ,y(-68),z(102)},
+			--left arm
+			{x(139),y(-50),z(45),x(71),y(-63),z(58)},
+			--right arm
+			{x(89),y(-50),z(102),x(71),y(-100),z(115)},
+			{x(115),y(-87),z(102),x(71),y(-100),z(115)},
+		}
+	},
+})
 
 minetest.register_entity("towntest_npc:builder", {
 	hp_max = 1,
@@ -65,9 +56,9 @@ minetest.register_entity("towntest_npc:builder", {
 	makes_footstep_sound = true,
 	collisionbox = {-0.4, -1, -0.4, 0.4, 1, 0.4},
 
-	visual_size = visual_size,
-	visual = visual,
-	textures = textures,
+	visual_size = nil,
+	visual = "wielditem",
+	textures = {"towntest_npc:builder_box"},
 
 	target = nil,
 	speed = nil,
@@ -75,9 +66,9 @@ minetest.register_entity("towntest_npc:builder", {
 	range_y = nil,
 	after = nil,
 	after_param = nil,
-	
+
 	food = 0,
-	
+
 	get_staticdata = function(self)
 		return minetest.serialize({
 			chestpos = self.chestpos,
@@ -101,7 +92,7 @@ minetest.register_entity("towntest_npc:builder", {
 			self.food = data.food
 		end
 	end,
-	
+
 	on_punch = function(self)
 		-- remove npc from the list of npcs when they die
 		if self.object:get_hp() <= 0 and self.chestpos then
@@ -110,7 +101,6 @@ minetest.register_entity("towntest_npc:builder", {
 	end,
 
 	on_step = function(self, dtime)
-	
 		-- remove
 		if not self.chestpos then
 			self.object:remove()
@@ -122,11 +112,28 @@ minetest.register_entity("towntest_npc:builder", {
 			local t = self.target
 			local diff = {x=t.x-s.x, y=t.y-s.y, z=t.z-s.z}
 
-			local yaw = math.atan(diff.z/diff.x)+math.pi/2
-			if diff.z ~= 0 or diff.x > 0 then
-				yaw = (yaw-0.5)*math.pi
+			local yaw = math.atan(diff.z / diff.x) + math.pi / 2
+			if diff.x == 0 then
+				if diff.z > 0 then
+					yaw = math.pi / 2 -- face north
+				else
+					yaw = - math.pi / 2 -- face south
+				end
+			elseif diff.x > 0 then
+				yaw = yaw - math.pi / 2
 			end
 			self.object:setyaw(yaw) -- turn and look in given direction
+
+			if math.abs(diff.x) < self.range and math.abs(diff.y) < self.range_y and math.abs(diff.z) < self.range then
+				self.object:setvelocity({x=0, y=0, z=0})
+				self.target = "reached" --status the after_param is in process
+				self.speed = nil
+				if self.after then
+					self.after(self, self.after_param) -- after they arrive
+				end
+				self.target = nil --self.after is done
+				return
+			end
 
 			local v = self.speed
 			if self.food > 0 then
@@ -139,16 +146,6 @@ minetest.register_entity("towntest_npc:builder", {
 			vec.y = diff.y*v/amount
 			vec.z = diff.z*v/amount
 			self.object:setvelocity(vec) -- walk in given direction
-
-			if math.abs(diff.x) < self.range and math.abs(diff.y) < self.range_y and math.abs(diff.z) < self.range then
-				self.object:setvelocity({x=0, y=0, z=0})
-				self.target = nil
-				self.speed = nil
-				if self.after then
-					self.after(self, self.after_param) -- after they arrive
-				end
-			end
-			
 		-- idle
 		else
 			-- look around
@@ -156,7 +153,7 @@ minetest.register_entity("towntest_npc:builder", {
 				self.object:setyaw(self.object:getyaw()+((math.random(0,360)-180)/180*math.pi))
 			end
 		end
-		
+
 	end,
 
 	-- API
@@ -178,3 +175,4 @@ minetest.register_entity("towntest_npc:builder", {
 		self.after_param = after_param
 	end
 })
+
