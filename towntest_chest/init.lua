@@ -192,35 +192,37 @@ local function skip_already_placed(building_plan, chestpos)
 		local pos = {x=def.x+chestpos.x,y=def.y+chestpos.y,z=def.z+chestpos.z}
 		if minetest.forceload_block(pos) then
 			local node_placed = minetest.get_node(pos)
-			if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
-				if -- [(def.param1 ~= node_placed.param1 and not (def.param1 == nil and node_placed.param1  == 0)) or ]-- -- param1 (light) is can be changed
-				(def.param2 ~= node_placed.param2 and not (def.param2 == nil and node_placed.param2  == 0)) then
-					def.matname = towntest_chest.c_free_item -- adjust params for free
-					table.insert(building_out, def)
-					dprint("adjust params for free",def.name, def.param1, node_placed.param1, def.param2, node_placed.param2 )
-				else
-					if not def.meta then
---						--same item without metadata. nothing to do
-					elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
---						--same metadata. Nothing to do
-					else
-						def.matname = towntest_chest.c_free_item       --metadata correction for free
+			if not (node_placed.drawtype == "airlike" and def.name == "air") then --skip all airlike
+				if node_placed.name == def.name or node_placed.name == minetest.registered_nodes[def.name].name then -- right node is at the place. there are no costs to touch them
+					if -- [(def.param1 ~= node_placed.param1 and not (def.param1 == nil and node_placed.param1  == 0)) or ]-- -- param1 (light) is can be changed
+					(def.param2 ~= node_placed.param2 and not (def.param2 == nil and node_placed.param2  == 0)) then
+						def.matname = towntest_chest.c_free_item -- adjust params for free
 						table.insert(building_out, def)
-						dprint("rebuild to correct metadata",def.name)
+						dprint("adjust params for free",def.name, def.param1, node_placed.param1, def.param2, node_placed.param2 )
+					else
+						if not def.meta then
+	--						--same item without metadata. nothing to do
+						elseif is_equal_meta(minetest.get_meta(pos):to_table(), def.meta) then
+	--						--same metadata. Nothing to do
+						else
+							def.matname = towntest_chest.c_free_item       --metadata correction for free
+							table.insert(building_out, def)
+							dprint("rebuild to correct metadata",def.name)
+						end
 					end
-				end
-			else
-				local mappeddef = towntest_chest.mapnodes(def)
-				if not mappeddef or mappeddef.name == "" then -- excluded by mapping
-					--skip
 				else
-					local mappednode = towntest_chest.mapnodes(node_placed)
-					if mappednode and mappednode.matname == mappeddef.matname then
-						def.matname = towntest_chest.c_free_item        --same price. Check/set for free
-						table.insert(building_out, def)
-						dprint("rebuild for free because of the same matname",def.name)
+					local mappeddef = towntest_chest.mapnodes(def)
+					if not mappeddef or mappeddef.name == "" then -- excluded by mapping
+						--skip
 					else
-						table.insert(building_out, def) --rebuild for payment as usual
+						local mappednode = towntest_chest.mapnodes(node_placed)
+						if mappednode and mappednode.matname == mappeddef.matname then
+							def.matname = towntest_chest.c_free_item        --same price. Check/set for free
+							table.insert(building_out, def)
+							dprint("rebuild for free because of the same matname",def.name)
+						else
+							table.insert(building_out, def) --rebuild for payment as usual
+						end
 					end
 				end
 			end
@@ -240,16 +242,53 @@ end
 -----------------------------------------------
 towntest_chest.do_prepare_building = function(building_in)
 	local building_out = {}
+	local building_indexed = {}
+	local sizing = {}
 	for idx,def in pairs(building_in) do
 		if (def.x and def.y and def.z) and -- more robust. Values should be existing
 		   (tonumber(def.x)~=0 or tonumber(def.y)~=0 or tonumber(def.z)~=0) then
+			-- create sizing information
+			if not sizing.min_x or sizing.min_x > def.x then
+				sizing.min_x = def.x
+			end
+			if not sizing.max_x or sizing.max_x < def.x then
+				sizing.max_x = def.x
+			end
+			if not sizing.min_y or sizing.min_y > def.y then
+				sizing.min_y = def.y
+			end
+			if not sizing.max_y or sizing.max_y < def.y then
+				sizing.max_y = def.y
+			end
+			if not sizing.min_z or sizing.min_z > def.z then
+				sizing.min_z = def.z
+			end
+			if not sizing.max_z or sizing.max_z < def.z then
+				sizing.max_z = def.z
+			end
+
+			-- map node
 			local mapped_def = towntest_chest.mapnodes(def)
 			if mapped_def and mapped_def.matname then -- found
 				-- the node will be built
 				table.insert(building_out, mapped_def)
+				building_indexed[def.x..'-'..def.y..'-'..def.z] = true -- mark as build
 			end
 		end
 	end
+-- fill building with air
+	for x = sizing.min_x -2, sizing.max_x + 2 do
+		for y = sizing.min_y, sizing.max_y + 3 do
+			for z = sizing.min_z - 2, sizing.max_z + 2 do
+				if not building_indexed[x..'-'..y..'-'..z] and  -- not in plan - flat them
+					(x ~=0 or y ~=0 or z ~=0) then  --not the chest
+					local node = { x=x, y=y, z=z, name="air", matname = towntest_chest.c_free_item }
+					table.insert(building_out, node)
+				end
+			end
+		end
+	end
+
 	return building_out
 end
 
@@ -576,7 +615,8 @@ towntest_chest.build = function(chestpos)
 							end
 
 							-- handle free items. There can be added, but relativelly to the needed
-							if v.matname == towntest_chest.c_free_item then -- is free item
+							if v.matname == towntest_chest.c_free_item and -- is free item
+								#free_nodes_pipe < 10 then                --limit for beter performance
 								table.insert(free_nodes_pipe, v)
 								dprint("free items pipeline:", #free_nodes_pipe)
 							end
