@@ -91,7 +91,7 @@ towntest_chest.mapping.customize_data = c
 -- Fallback nodes replacement of  unknown nodes
 -- Maybe it is beter to use aliases for unknown notes. But anyway
 -- TODO: should be editable in game trough a nice gui, to customize the building before build
-towntest_chest.mapping.unknown_nodes = function(node)
+function towntest_chest.mapping.unknown_nodes(node)
 
 	local map = towntest_chest.mapping.unknown_nodes_data[node.name]
 	if not map or map.name == node.name then -- no fallback mapping. don't use the node
@@ -142,7 +142,7 @@ end
 
 -- Nodes replacement to customizie buildings
 -- TODO: should be editable in game trough a nice gui, to customize the building before build
-towntest_chest.mapping.customize = function(node)
+function towntest_chest.mapping.customize(node)
 	local map = towntest_chest.mapping.customize_data[node.name]
 	if not map then -- no mapping. return unchanged
 		return node
