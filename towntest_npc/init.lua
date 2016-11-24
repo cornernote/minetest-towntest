@@ -80,7 +80,7 @@ minetest.register_entity("towntest_npc:builder", {
 		local data = minetest.deserialize(staticdata)
 		-- load chestpos
 		if data and data.chestpos then
-			local k = data.chestpos.x..","..data.chestpos.y..","..data.chestpos.z
+			local k = minetest.pos_to_string(data.chestpos)
 			if towntest_chest.npc[k] then
 				towntest_chest.npc[k]:remove()
 			end
@@ -96,7 +96,7 @@ minetest.register_entity("towntest_npc:builder", {
 	on_punch = function(self)
 		-- remove npc from the list of npcs when they die
 		if self.object:get_hp() <= 0 and self.chestpos then
-			towntest_chest.npc[self.chestpos.x..","..self.chestpos.y..","..self.chestpos.z] = nil
+			towntest_chest.npc[minetest.pos_to_string(self.chestpos)] = nil
 		end
 	end,
 
